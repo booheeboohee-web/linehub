@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/scenarios/deliver",
-      "schedule": "* * * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
