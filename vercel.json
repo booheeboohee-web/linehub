@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/scenarios/deliver",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
+{}
