@@ -9,6 +9,8 @@ import {
   Send,
   LayoutGrid,
   Settings,
+  BarChart2,
+  Tag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +26,8 @@ const navItems: NavItem[] = [
   { label: 'シナリオ配信', href: '/dashboard/scenarios', icon: GitBranch },
   { label: '一斉配信', href: '/dashboard/broadcast', icon: Send },
   { label: 'リッチメニュー', href: '/dashboard/richmenu', icon: LayoutGrid },
+  { label: '分析', href: '/dashboard/analytics', icon: BarChart2 },
+  { label: 'タグ管理', href: '/dashboard/tags', icon: Tag },
   { label: '設定', href: '/dashboard/settings', icon: Settings },
 ]
 
