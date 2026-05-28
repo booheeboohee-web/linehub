@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { LayoutGrid, Plus, Pencil, Trash2, Zap, CheckCircle } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { LayoutGrid, Plus, Pencil, Trash2, Zap, CheckCircle, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RichMenu } from '@/types/database'
 import { RichMenuEditor } from './RichMenuEditor'
@@ -16,6 +16,8 @@ export function RichMenuList({ initialMenus }: Props) {
   const [editingMenu, setEditingMenu] = useState<RichMenu | null>(null)
   const [activating, setActivating] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const fileInputRef = useRef<{ [menuId: string]: HTMLInputElement | null }>({})
 
   async function handleActivate(menu: RichMenu) {
     setActivating(menu.id)
@@ -59,6 +61,34 @@ export function RichMenuList({ initialMenus }: Props) {
   function handleNew() {
     setEditingMenu(null)
     setEditorOpen(true)
+  }
+
+  async function handleImageUpload(menu: RichMenu, file: File) {
+    setUploading(menu.id)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`/api/richmenu/${menu.id}/image`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error ?? '画像のアップロードに失敗しました')
+        return
+      }
+      // Update local state to show image was uploaded
+      setMenus(prev => prev.map(m =>
+        m.id === menu.id
+          ? { ...m, image_url: `line://richmenu-image/${m.line_rich_menu_id}` }
+          : m
+      ))
+      alert('画像をアップロードしました！LINEアプリで確認してください。')
+    } catch (err) {
+      alert(`エラー: ${err}`)
+    } finally {
+      setUploading(null)
+    }
   }
 
   function handleSaved(menu: RichMenu) {
@@ -137,7 +167,11 @@ export function RichMenuList({ initialMenus }: Props) {
               </div>
 
               {/* Preview image */}
-              {menu.image_url ? (
+              {menu.image_url?.startsWith('line://') ? (
+                <div className="mb-3 flex h-20 items-center justify-center rounded-lg border border-green-200 bg-green-50">
+                  <span className="text-sm font-medium text-green-700">✓ 画像アップロード済み</span>
+                </div>
+              ) : menu.image_url ? (
                 <div className="mb-3 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -147,8 +181,11 @@ export function RichMenuList({ initialMenus }: Props) {
                   />
                 </div>
               ) : (
-                <div className="mb-3 flex h-20 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50">
+                <div className="mb-3 flex h-20 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 gap-1">
                   <LayoutGrid className="h-6 w-6 text-slate-300" />
+                  {menu.is_active && (
+                    <p className="text-xs text-slate-400 px-2 text-center">画像をアップロードしてLINEに表示させましょう</p>
+                  )}
                 </div>
               )}
 
@@ -158,7 +195,7 @@ export function RichMenuList({ initialMenus }: Props) {
               </p>
 
               {/* Actions */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {!menu.is_active && (
                   <button
                     onClick={() => handleActivate(menu)}
@@ -184,6 +221,30 @@ export function RichMenuList({ initialMenus }: Props) {
                   <Trash2 className="h-3 w-3" />
                   削除
                 </button>
+                {/* Image upload - only for active menus with LINE ID */}
+                {menu.is_active && menu.line_rich_menu_id && (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="hidden"
+                      ref={(el) => { fileInputRef.current[menu.id] = el }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleImageUpload(menu, file)
+                        e.target.value = '' // reset
+                      }}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current[menu.id]?.click()}
+                      disabled={uploading === menu.id}
+                      className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-60 transition-colors"
+                    >
+                      <Upload className="h-3 w-3" />
+                      {uploading === menu.id ? 'アップロード中…' : '画像アップロード'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
