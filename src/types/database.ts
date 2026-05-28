@@ -106,11 +106,12 @@ export interface RichMenu {
 export interface RichMenuArea {
   bounds: { x: number; y: number; width: number; height: number }
   action: {
-    type: 'message' | 'uri' | 'postback'
+    type: 'message' | 'uri' | 'postback' | 'richmenuswitch'
     text?: string
     uri?: string
     data?: string
     label?: string
+    richMenuAliasId?: string
   }
 }
 

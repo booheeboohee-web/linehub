@@ -73,6 +73,20 @@ export async function deleteRichMenu(richMenuId: string) {
   return res.ok
 }
 
+export async function createRichMenuAlias(richMenuAliasId: string, richMenuId: string) {
+  // Delete first to avoid conflict (ignore errors)
+  try { await deleteRichMenuAlias(richMenuAliasId) } catch {}
+  return linePost('/richmenu/alias', { richMenuAliasId, richMenuId })
+}
+
+export async function deleteRichMenuAlias(richMenuAliasId: string) {
+  const res = await fetch(`${LINE_API}/richmenu/alias/${richMenuAliasId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` },
+  })
+  return res.ok
+}
+
 // ---- Internal ----
 async function linePost(path: string, body: object) {
   const res = await fetch(`${LINE_API}${path}`, {

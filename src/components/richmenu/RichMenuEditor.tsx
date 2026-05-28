@@ -28,6 +28,7 @@ const ACTION_TYPES: { value: RichMenuArea['action']['type']; label: string }[] =
   { value: 'message', label: 'テキスト送信' },
   { value: 'uri', label: 'URL' },
   { value: 'postback', label: 'ポストバック' },
+  { value: 'richmenuswitch', label: 'タブ切り替え' },
 ]
 
 interface AreaConfig {
@@ -36,6 +37,7 @@ interface AreaConfig {
   uri: string
   data: string
   label: string
+  richMenuAliasId: string
 }
 
 const defaultAreaConfig = (): AreaConfig => ({
@@ -44,6 +46,7 @@ const defaultAreaConfig = (): AreaConfig => ({
   uri: '',
   data: '',
   label: '',
+  richMenuAliasId: '',
 })
 
 interface Props {
@@ -65,6 +68,7 @@ export function RichMenuEditor({ menu, onClose, onSaved }: Props) {
         uri: a.action.uri ?? '',
         data: a.action.data ?? '',
         label: a.action.label ?? '',
+        richMenuAliasId: a.action.richMenuAliasId ?? '',
       }))
     }
     return Array.from({ length: 6 }, defaultAreaConfig)
@@ -113,6 +117,10 @@ export function RichMenuEditor({ menu, onClose, onSaved }: Props) {
         action.data = cfg.data
         action.text = cfg.text
         action.label = cfg.label
+      }
+      if (cfg.actionType === 'richmenuswitch') {
+        action.richMenuAliasId = cfg.richMenuAliasId
+        action.data = cfg.data || 'switch'
       }
       return { bounds: bounds[i], action }
     })
@@ -173,6 +181,15 @@ export function RichMenuEditor({ menu, onClose, onSaved }: Props) {
             <div className="space-y-4 p-6">
               {error && (
                 <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+              )}
+
+              {menu?.id && (
+                <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">
+                  <span className="font-medium">このメニューのエイリアスID:</span>{' '}
+                  <span className="font-mono">{`richmenu-alias-${menu.id.slice(0, 8)}`}</span>
+                  <br />
+                  <span>（他のメニューのタブ切り替えで使用）</span>
+                </div>
               )}
 
               <div>
@@ -305,6 +322,19 @@ export function RichMenuEditor({ menu, onClose, onSaved }: Props) {
                               />
                             </div>
                           </>
+                        )}
+                        {cfg.actionType === 'richmenuswitch' && (
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">切り替え先エイリアスID</label>
+                            <input
+                              type="text"
+                              value={cfg.richMenuAliasId}
+                              onChange={(e) => updateArea(i, 'richMenuAliasId', e.target.value)}
+                              placeholder="richmenu-alias-xxxxxxxx"
+                              className="w-full rounded border border-white/60 bg-white/80 px-2 py-1 text-xs focus:outline-none"
+                            />
+                            <p className="mt-1 text-xs text-slate-500">例: richmenu-alias-xxxxxxxx</p>
+                          </div>
                         )}
                       </div>
                     </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRichMenu, setDefaultRichMenu } from '@/lib/line'
+import { createRichMenu, setDefaultRichMenu, createRichMenuAlias } from '@/lib/line'
 import { createAdminClient } from '@/lib/supabase/server'
 
 type Params = { params: Promise<{ id: string }> }
@@ -31,6 +31,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     const result = await createRichMenu(linePayload)
     const lineRichMenuId: string = result.richMenuId
+
+    // Create LINE alias so other menus can reference this one via richmenuswitch
+    const aliasId = `richmenu-alias-${id.slice(0, 8)}`
+    try {
+      await createRichMenuAlias(aliasId, lineRichMenuId)
+    } catch (aliasErr) {
+      console.warn('Alias creation failed (non-fatal):', aliasErr)
+    }
 
     // Set as default for all users
     await setDefaultRichMenu(lineRichMenuId)
