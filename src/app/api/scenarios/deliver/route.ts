@@ -8,10 +8,16 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { pushMessage } from '@/lib/line'
 
 export async function GET(req: Request) {
-  // 簡易認証（Vercel Cron は Authorization: Bearer <CRON_SECRET> を送る）
-  const auth = req.headers ? new Headers(req.headers).get('authorization') : null
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // 簡易認証: Authorization: Bearer <CRON_SECRET> または ?secret=<CRON_SECRET>
+  if (process.env.CRON_SECRET) {
+    const url = new URL(req.url)
+    const querySecret = url.searchParams.get('secret')
+    const auth = new Headers(req.headers).get('authorization')
+    const headerOk = auth === `Bearer ${process.env.CRON_SECRET}`
+    const queryOk = querySecret === process.env.CRON_SECRET
+    if (!headerOk && !queryOk) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
   }
 
   const supabase = await createAdminClient()
