@@ -111,6 +111,9 @@ async function handleEvent(event: LineEvent, supabase: Awaited<ReturnType<typeof
           await supabase
             .from('friend_tags')
             .upsert({ friend_id: friend.id, tag_id: tag.id }, { onConflict: 'friend_id,tag_id' })
+
+          // tag_added トリガーのシナリオを起動
+          await startScenariosForTagTrigger(tag.id, friend.id, supabase)
         }
       }
 
@@ -165,6 +168,30 @@ async function startScenariosForTrigger(
     .from('scenarios')
     .select('id')
     .eq('trigger_type', triggerType)
+    .eq('is_active', true)
+
+  for (const scenario of scenarios ?? []) {
+    await supabase.from('scenario_subscribers').upsert({
+      scenario_id: scenario.id,
+      friend_id: friendId,
+      current_step: 0,
+      started_at: new Date().toISOString(),
+      next_send_at: new Date().toISOString(),
+      status: 'active',
+    }, { onConflict: 'scenario_id,friend_id' })
+  }
+}
+
+async function startScenariosForTagTrigger(
+  tagId: string,
+  friendId: string,
+  supabase: Awaited<ReturnType<typeof createAdminClient>>
+) {
+  const { data: scenarios } = await supabase
+    .from('scenarios')
+    .select('id')
+    .eq('trigger_type', 'tag_added')
+    .eq('trigger_tag_id', tagId)
     .eq('is_active', true)
 
   for (const scenario of scenarios ?? []) {

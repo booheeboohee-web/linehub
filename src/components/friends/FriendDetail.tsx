@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { X, Plus, Trash2, MessageSquare, Calendar, Clock } from 'lucide-react'
+import { X, Plus, Trash2, MessageSquare, Calendar, Clock, Send } from 'lucide-react'
 import { cn, formatDate, platformLabel, platformColor } from '@/lib/utils'
 import type { Friend, Tag, MessageLog } from '@/types/database'
 
@@ -21,6 +21,9 @@ export default function FriendDetail({ friendId, allTags, onClose, onUpdate }: F
   const [loading, setLoading] = useState(false)
   const [tagLoading, setTagLoading] = useState(false)
   const [showTagSelect, setShowTagSelect] = useState(false)
+  const [sendText, setSendText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sendResult, setSendResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const fetchDetail = useCallback(async () => {
     if (!friendId) return
@@ -87,6 +90,32 @@ export default function FriendDetail({ friendId, allTags, onClose, onUpdate }: F
       await fetchDetail()
     } finally {
       setTagLoading(false)
+    }
+  }
+
+  async function handleSendMessage() {
+    if (!friend || !sendText.trim()) return
+    setSending(true)
+    setSendResult(null)
+    try {
+      const res = await fetch(`/api/friends/${friend.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: sendText.trim() }),
+      })
+      if (res.ok) {
+        setSendText('')
+        setSendResult({ ok: true, msg: '送信しました！' })
+        await fetchDetail()
+      } else {
+        const data = await res.json()
+        setSendResult({ ok: false, msg: data.error ?? '送信に失敗しました' })
+      }
+    } catch {
+      setSendResult({ ok: false, msg: '通信エラーが発生しました' })
+    } finally {
+      setSending(false)
+      setTimeout(() => setSendResult(null), 3000)
     }
   }
 
@@ -286,6 +315,40 @@ export default function FriendDetail({ friendId, allTags, onClose, onUpdate }: F
                   </p>
                 )}
               </div>
+
+              {/* 個別メッセージ送信 */}
+              {friend.status === 'active' && friend.platform === 'line' && (
+                <div className="space-y-2">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <Send className="h-4 w-4" />
+                    メッセージを送る
+                  </h4>
+                  <div className="flex gap-2">
+                    <textarea
+                      value={sendText}
+                      onChange={(e) => setSendText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendMessage()
+                      }}
+                      rows={2}
+                      placeholder="メッセージを入力… (⌘+Enter で送信)"
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sending || !sendText.trim()}
+                      className="self-end rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                    >
+                      {sending ? '…' : <Send className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {sendResult && (
+                    <p className={cn('text-xs', sendResult.ok ? 'text-green-600' : 'text-red-600')}>
+                      {sendResult.msg}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* メッセージ履歴 */}
               <div className="space-y-2">
