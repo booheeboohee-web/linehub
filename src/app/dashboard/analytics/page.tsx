@@ -108,10 +108,11 @@ export default async function AnalyticsPage() {
 
   // Build tag distribution
   const tagMap: Record<string, { name: string; color: string; count: number }> = {}
-  ;(tagStatsRaw ?? []).forEach((row: { tag_id: string; tag: { name: string; color: string } | null }) => {
-    if (!row.tag) return
+  ;(tagStatsRaw ?? []).forEach((row: { tag_id: string; tag: { name: string; color: string }[] | null }) => {
+    const tag = Array.isArray(row.tag) ? row.tag[0] : row.tag
+    if (!tag) return
     if (!tagMap[row.tag_id]) {
-      tagMap[row.tag_id] = { name: row.tag.name, color: row.tag.color, count: 0 }
+      tagMap[row.tag_id] = { name: tag.name, color: tag.color, count: 0 }
     }
     tagMap[row.tag_id].count++
   })
