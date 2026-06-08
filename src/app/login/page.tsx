@@ -50,7 +50,7 @@ export default function LoginPage() {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email.trim(),
         {
-          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/reset-password`,
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://linehub-lime.vercel.app'}/reset-password`,
         }
       )
 
