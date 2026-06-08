@@ -125,6 +125,33 @@ async function handleEvent(event: LineEvent, supabase: Awaited<ReturnType<typeof
     return
   }
 
+  // 非テキストメッセージ受信（スタンプ・画像など）→ログのみ
+  if (event.type === 'message' && event.message?.type !== 'text') {
+    const { data: friend } = await supabase
+      .from('friends')
+      .select('id')
+      .eq('platform', 'line')
+      .eq('platform_user_id', userId)
+      .single()
+    if (friend) {
+      await supabase.from('message_logs').insert({
+        friend_id: friend.id,
+        platform: 'line',
+        direction: 'inbound',
+        message_type: event.message?.type ?? null,
+        message_content: null,
+        source_type: 'webhook',
+        status: 'received',
+        sent_at: new Date().toISOString(),
+      })
+      // last_interacted_at を更新
+      await supabase.from('friends')
+        .update({ last_interacted_at: new Date().toISOString() })
+        .eq('id', friend.id)
+    }
+    return
+  }
+
   // メッセージ受信
   if (event.type === 'message' && event.message?.type === 'text') {
     const text: string = event.message.text ?? ''

@@ -23,6 +23,14 @@ export async function GET(req: Request) {
   const supabase = await createAdminClient()
   const now = new Date().toISOString()
 
+  // 10分以上 sending のまま詰まっている配信を error に回収
+  const stuckThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+  await supabase
+    .from('broadcasts')
+    .update({ status: 'error' })
+    .eq('status', 'sending')
+    .lte('updated_at', stuckThreshold)
+
   // 送信時刻を過ぎた予約配信を取得
   const { data: broadcasts } = await supabase
     .from('broadcasts')

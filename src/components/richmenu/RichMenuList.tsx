@@ -194,6 +194,13 @@ export function RichMenuList({ initialMenus }: Props) {
                 {menu.size_width} × {menu.size_height} / エリア {menu.areas?.length ?? 0}個
               </p>
 
+              {/* 画像未アップロード警告 */}
+              {menu.is_active && !menu.image_url && (
+                <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                  ⚠️ 画像がありません。LINEでは空白表示になります。下の「画像アップロード」から設定してください。
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex flex-wrap gap-2">
                 {!menu.is_active && (
