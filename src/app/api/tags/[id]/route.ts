@@ -38,11 +38,28 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
   const supabase = await createAdminClient()
+  const force = new URL(req.url).searchParams.get('force') === 'true'
+
+  // シナリオのトリガーとして使われているか確認
+  const { data: usedScenarios } = await supabase
+    .from('scenarios')
+    .select('id, name')
+    .eq('trigger_tag_id', id)
+
+  if (!force && usedScenarios && usedScenarios.length > 0) {
+    return NextResponse.json(
+      {
+        error: 'このタグはシナリオのトリガーとして使用されています',
+        scenarios: usedScenarios,
+      },
+      { status: 409 }
+    )
+  }
 
   const { error } = await supabase
     .from('tags')

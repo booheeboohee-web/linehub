@@ -53,16 +53,30 @@ export default function TagsClient({ initialTags }: TagsClientProps) {
     }
   }
 
-  async function handleDelete(tagId: string) {
-    if (!confirm('このタグを削除しますか？\n友だちへの紐づけも解除されます。')) return
+  async function handleDelete(tagId: string, force = false) {
+    if (!force && !confirm('このタグを削除しますか？\n友だちへの紐づけも解除されます。')) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/tags/${tagId}`, { method: 'DELETE' })
+      const url = force ? `/api/tags/${tagId}?force=true` : `/api/tags/${tagId}`
+      const res = await fetch(url, { method: 'DELETE' })
+      const json = await res.json()
+
+      if (res.status === 409 && json.scenarios) {
+        const names = (json.scenarios as { name: string }[]).map(s => `・${s.name}`).join('\n')
+        const confirmed = confirm(
+          `このタグは以下のシナリオのトリガーとして使われています：\n\n${names}\n\nシナリオのトリガーが解除されますが、削除を続けますか？`
+        )
+        if (confirmed) await handleDelete(tagId, true)
+        return
+      }
+
       if (res.ok) {
         setTags(prev => prev.filter(t => t.id !== tagId))
+      } else {
+        setError(json.error ?? '削除に失敗しました')
       }
     } catch {
-      // silent
+      setError('通信エラーが発生しました')
     } finally {
       setLoading(false)
     }

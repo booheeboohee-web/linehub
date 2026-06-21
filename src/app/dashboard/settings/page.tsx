@@ -131,6 +131,20 @@ export default function SettingsPage() {
   const [intervalMin, setIntervalMin] = useState(1)
   const [generalSaved, setGeneralSaved] = useState(false)
 
+  useEffect(() => {
+    const saved = localStorage.getItem('linehub_settings')
+    if (saved) {
+      try {
+        const s = JSON.parse(saved)
+        if (s.serviceName) setServiceName(s.serviceName)
+        if (s.timezone) setTimezone(s.timezone)
+        if (s.intervalMin) setIntervalMin(s.intervalMin)
+      } catch {
+        // ignore
+      }
+    }
+  }, [])
+
   async function handleTestConnection() {
     setTesting(true)
     setTestResult(null)
@@ -149,6 +163,7 @@ export default function SettingsPage() {
   }
 
   function handleSaveGeneral() {
+    localStorage.setItem('linehub_settings', JSON.stringify({ serviceName, timezone, intervalMin }))
     setGeneralSaved(true)
     setTimeout(() => setGeneralSaved(false), 2000)
   }
