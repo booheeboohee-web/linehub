@@ -40,6 +40,17 @@ class Worker:
                 path="-",
                 detail=f"人間確認が必要: {note}",
             )
+        if action == "paid_feature_request":
+            # 課金が必要な処理は絶対に自動実行しない。
+            # 「人間の承認が必要」として記録するだけにとどめる。
+            note = task["note"]
+            logger.warning("課金が必要なため自動実行しません。人間の承認が必要: %s", note)
+            return FileOpResult(
+                ok=True,
+                action="paid_feature_request",
+                path="-",
+                detail=f"課金が必要なため人間の承認が必要: {note}",
+            )
 
         return FileOpResult(
             ok=False, action=action, path=task.get("path", "-"),

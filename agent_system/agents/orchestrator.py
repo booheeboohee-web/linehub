@@ -15,7 +15,13 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_ACTIONS = {"write_file", "append_file", "replace_text", "human_review"}
+SUPPORTED_ACTIONS = {
+    "write_file",
+    "append_file",
+    "replace_text",
+    "human_review",
+    "paid_feature_request",
+}
 
 # アクションごとの必須フィールド
 _REQUIRED_FIELDS: dict[str, list[str]] = {
@@ -23,6 +29,8 @@ _REQUIRED_FIELDS: dict[str, list[str]] = {
     "append_file": ["path", "content"],
     "replace_text": ["path", "old", "new"],
     "human_review": ["note"],
+    # 課金が必要な処理の申請。自動実行はされず、人間の承認待ちとして記録される
+    "paid_feature_request": ["note"],
 }
 
 

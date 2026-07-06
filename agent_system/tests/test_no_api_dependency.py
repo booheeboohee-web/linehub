@@ -1,8 +1,12 @@
 """外部 API・ネットワーク・課金要素への依存が存在しないことのテスト。
 
-- 課金 API のキー名・SDK 名がコード/ドキュメントに存在しない
+- 課金 API のキー名・SDK 名が稼働コード/ドキュメントに存在しない
 - ネットワーク通信を行うモジュールを import していない
 - 依存パッケージ定義(requirements 等)が存在しない、または禁止パッケージを含まない
+- 稼働コードが archive/(退避した課金前提の実装)を import していない
+
+archive/ は「削除ではなく退避」した参照用コードのため、内容スキャンの
+対象外とする。ただし稼働コードから archive を import しないことは検証する。
 """
 
 from __future__ import annotations
@@ -38,14 +42,19 @@ FORBIDDEN_IMPORT_RE = re.compile(
 FORBIDDEN_DOTENV_RE = re.compile(r"load_dotenv|dotenv|open\(\s*['\"]\.env")
 
 
+# スキャン対象外: tests(このテスト自身)、archive(退避コード。import されない
+# ことは test_active_code_does_not_import_archive で別途検証)、自動生成物
+EXCLUDED_TOP_DIRS = {"tests", "archive", "logs", "backups", "__pycache__"}
+
+
 def target_files(suffixes: tuple[str, ...]) -> list[Path]:
-    """tests/ 以外の対象ファイルを列挙する(このテスト自身は除外)。"""
+    """稼働コード・ドキュメントの対象ファイルを列挙する。"""
     files = []
     for path in BASE_DIR.rglob("*"):
         if path.suffix not in suffixes or not path.is_file():
             continue
         rel = path.relative_to(BASE_DIR)
-        if rel.parts[0] in {"tests", "logs", "backups", "__pycache__"}:
+        if rel.parts[0] in EXCLUDED_TOP_DIRS:
             continue
         if "__pycache__" in rel.parts:
             continue
@@ -100,6 +109,16 @@ class TestNoAPIDependency(unittest.TestCase):
             self.assertFalse(
                 path.exists(),
                 f"{name} が存在します。標準ライブラリのみで動作する設計を維持してください",
+            )
+
+    def test_active_code_does_not_import_archive(self):
+        """稼働コードが archive/(退避した課金前提の実装)を import していない。"""
+        pattern = re.compile(r"^\s*(?:import|from)\s+archive\b", re.MULTILINE)
+        for path in target_files((".py",)):
+            text = path.read_text(encoding="utf-8")
+            self.assertIsNone(
+                pattern.search(text),
+                f"{path} が archive/ を import しています(復元は人間の判断が必要)",
             )
 
     def test_no_subprocess_git_push_or_curl(self):

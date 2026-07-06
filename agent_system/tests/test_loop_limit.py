@@ -106,6 +106,40 @@ class TestMissingPlan(LoopTestBase):
         self.assertIn("人間確認が必要", saved)
 
 
+class TestPaidFeatureGate(LoopTestBase):
+    """課金が必要な処理は自動実行されず、人間の承認待ちとして記録される。"""
+
+    def test_paid_feature_request_is_not_executed_and_needs_approval(self):
+        self.write_plan(
+            [
+                {
+                    "action": "paid_feature_request",
+                    "note": "外部モデル呼び出し(archive/api_based の復元)を行いたい",
+                },
+                {
+                    "action": "write_file",
+                    "path": "a.md",
+                    "content": "通常タスクは続行できる",
+                    "verify": {"contains": ["続行できる"]},
+                },
+            ]
+        )
+        loop = self.build_loop(apply=True)
+        final = loop.run()
+
+        # 課金申請でループ全体は止まらず、通常タスクは完了する
+        self.assertIs(final, Phase.DONE)
+        # 課金が必要な処理そのものは何も実行されていない(ファイル生成なし等)
+        self.assertEqual(
+            {p.name for p in self.workspace.rglob("*") if p.is_file()},
+            {"plan.json", "a.md"},
+        )
+        # 人間の承認待ちとして STATE.md に記録されている
+        saved = self.state_file.read_text(encoding="utf-8")
+        self.assertIn("課金が必要なため人間の承認が必要", saved)
+        self.assertIn("未実行", saved)
+
+
 class TestSuccessPath(LoopTestBase):
     def test_all_tasks_pass_returns_done(self):
         self.write_plan(

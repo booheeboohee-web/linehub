@@ -52,6 +52,13 @@ class Verifier:
                 passed=True, feedback=f"自動検証対象外(人間確認待ち): {note}"
             )
 
+        # 課金が必要な処理は実行されていないことを前提に、承認待ちとして記録する。
+        if task["action"] == "paid_feature_request":
+            note = f"課金が必要なため人間の承認が必要(未実行): {task['note']}"
+            logger.warning(note)
+            self.state.add_pending_review(note)
+            return VerificationResult(passed=True, feedback=note)
+
         # 画像が対象なら Vision チェックは行わず、人間確認を要求するだけ
         path = task.get("path", "")
         if Path(path).suffix.lower() in _IMAGE_SUFFIXES:

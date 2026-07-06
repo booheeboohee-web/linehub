@@ -47,6 +47,30 @@ Claude Code のセッション内で人間が実行・確認して使う、**完
 | 機密情報の保存禁止 | STATE.md・ログ・成果物への書き込みは全て redact(メール・電話番号・キー/トークンらしき文字列を `[REDACTED]` に置換) |
 | 失敗時の停止 | 同一タスクが 3 回連続で失敗したら必ず停止して人間確認を要求 |
 | 画像 | Vision チェックは実装しない。「人間確認が必要」とログ・STATE.md に記録するのみ |
+| 課金が必要な処理 | 自動実行しない。`paid_feature_request` として申請し、「人間の承認が必要」と STATE.md に記録するのみ |
+
+## 課金が必要な処理の扱い
+
+課金が発生しうる処理(外部モデル呼び出し、有料サービス利用など)は
+**コードからは一切実行できません**。必要になった場合は plan.json に
+`paid_feature_request` タスクとして「申請」だけを記録します。
+
+```json
+{"action": "paid_feature_request", "note": "何にいくら掛かる見込みか・なぜ必要か"}
+```
+
+このタスクは何も実行せず、STATE.md の Pending Human Review に
+「課金が必要なため人間の承認が必要(未実行)」と記録されるだけです。
+承認・契約・実装の判断はすべて人間が行います。
+
+## archive/ — 退避コード
+
+過去に使っていた「外部モデルをコードから呼び出す構成」(課金が必要)は、
+削除せず `archive/api_based/` に退避してあります。
+
+- 稼働コードからは一切 import されません(テストで機械的に検証)
+- 復元には人間の確認が必須です(課金・契約・機密送信リスクの承諾)。
+  手順と確認事項は `archive/README.md` を参照してください
 
 ## ディレクトリ構成
 
@@ -68,6 +92,8 @@ agent_system/
 │   └── safe_file_ops.py  # dry-run / --apply / バックアップ
 ├── workspace/            # 唯一の編集可能領域(plan.json もここ)
 │   └── plan.example.json # タスク計画のひな形
+├── archive/              # 退避コード(課金前提の旧実装。稼働コードから未参照)
+│   └── api_based/
 ├── backups/              # 実編集前の自動バックアップ(自動生成)
 ├── logs/                 # 実行ログ(自動生成・redact 済み)
 └── tests/                # セキュリティ・非依存性のテスト
@@ -100,7 +126,8 @@ python main.py --apply
      "verify": {"contains": ["必須文字列"], "not_contains": ["禁止文字列"]}},
     {"action": "append_file",  "path": "notes/a.md", "content": "..."},
     {"action": "replace_text", "path": "notes/a.md", "old": "前", "new": "後"},
-    {"action": "human_review", "note": "人間が目視確認する内容"}
+    {"action": "human_review", "note": "人間が目視確認する内容"},
+    {"action": "paid_feature_request", "note": "課金が必要な処理の申請(未実行のまま承認待ちになる)"}
   ]
 }
 ```
