@@ -1,35 +1,28 @@
-"""Verifier: 完全に独立した検証エージェント。
+"""Verifier: Worker から独立した検証(完全ローカル)。
 
-Worker の出力と初期目標を照合し、合否とフィードバックを返す。
-Worker とは別のモデル設定・別のシステムプロンプトで動作し、
-Worker の会話履歴を一切共有しない(独立性の担保)。
+Worker の内部状態を一切共有せず、タスク定義(plan.json の verify 条件)と
+実行結果だけを突き合わせて合否を判定する。
 
-vision_check は Vision(画像認識)による検証を模倣する機構。
-実 API 使用時は image content block を組み立てて送信し、
-画像が存在しない場合はテキストのみの検証にフォールバックする。
+- apply モードでは実ファイルを読み直して検証(Worker の申告を信用しない)
+- dry-run では書き込み予定内容(new_content)を検証
+- 成果物に機密情報らしき文字列が残っていれば不合格
+- 画像ファイルが対象の場合、Vision チェックは実装しない。
+  「人間確認が必要」とログ・STATE.md に記録するだけにする。
 """
 
 from __future__ import annotations
 
-import base64
-import json
 import logging
-import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-from agents.base import BaseAgent
+from core import redactor, security
+from core.safe_file_ops import FileOpResult
+from core.state_manager import StateManager
 
 logger = logging.getLogger(__name__)
 
-_MEDIA_TYPES = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-}
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
 
 
 @dataclass
@@ -38,71 +31,72 @@ class VerificationResult:
     feedback: str
 
 
-class Verifier(BaseAgent):
-    role = "verifier"
-    system_prompt = (
-        "あなたは自律型エージェントシステムの Verifier(独立検証担当)です。"
-        "Worker の出力が初期目標とサブタスクの要件を満たしているかを、"
-        "第三者として厳格に検証してください。"
-        '出力は JSON のみ: {"passed": true|false, "feedback": "理由"}'
-    )
+class Verifier:
+    """独立検証担当。Worker とはオブジェクトも状態も共有しない。"""
 
-    def verify(self, goal: str, subtask: str, output: str) -> VerificationResult:
-        """Worker の出力を初期目標と照合する。"""
-        prompt = (
-            f"# 初期目標\n{goal}\n\n"
-            f"# サブタスク\n{subtask}\n\n"
-            f"# Worker の出力(検証対象)\n{output}\n\n"
-            "この出力はサブタスクの要件と初期目標に整合していますか?"
-            "JSON のみで回答してください。"
-        )
-        return self._parse_result(self._call(prompt))
+    def __init__(self, workspace: Path, state: StateManager):
+        self.workspace = Path(workspace)
+        self.state = state
 
-    def vision_check(self, goal: str, image_path: str | Path) -> VerificationResult:
-        """Vision チェック機構: 画像成果物を目視検証(の模倣)。
+    def verify(self, task: dict, result: FileOpResult) -> VerificationResult:
+        # 実行自体が失敗していれば不合格
+        if not result.ok:
+            return VerificationResult(passed=False, feedback=result.detail)
 
-        画像ファイルが存在すれば image block 付きで検証を依頼し、
-        存在しなければスキップ扱い(passed=True, 注記付き)で返す。
-        MockLLMClient 使用時も同じ経路を通るため、パイプラインの
-        Vision 検証ステップを模倣できる。
-        """
-        path = Path(image_path)
-        media_type = _MEDIA_TYPES.get(path.suffix.lower())
-        if not path.exists() or media_type is None:
-            logger.info("vision_check: 画像 %s が無いためスキップします", path)
+        # human_review は自動検証の対象外。人間確認待ちとして記録する。
+        if task["action"] == "human_review":
+            note = task["note"]
+            logger.warning("人間確認が必要: %s", note)
+            self.state.add_pending_review(note)
             return VerificationResult(
-                passed=True, feedback=f"画像 {path} が存在しないため Vision 検証をスキップ"
+                passed=True, feedback=f"自動検証対象外(人間確認待ち): {note}"
             )
 
-        image_data = base64.standard_b64encode(path.read_bytes()).decode("ascii")
-        content: list[dict[str, Any]] = [
-            {
-                "type": "image",
-                "source": {"type": "base64", "media_type": media_type, "data": image_data},
-            },
-            {
-                "type": "text",
-                "text": (
-                    f"# 初期目標\n{goal}\n\n"
-                    "この画像は初期目標の成果物として妥当ですか?"
-                    "JSON のみで回答してください。"
-                ),
-            },
-        ]
-        return self._parse_result(self._call(content))
+        # 画像が対象なら Vision チェックは行わず、人間確認を要求するだけ
+        path = task.get("path", "")
+        if Path(path).suffix.lower() in _IMAGE_SUFFIXES:
+            note = f"画像 {path} の内容確認(Vision チェックは行いません)"
+            logger.warning("人間確認が必要: %s", note)
+            self.state.add_pending_review(note)
+            return VerificationResult(
+                passed=True, feedback=f"画像のため自動検証をスキップ。{note}"
+            )
 
-    @staticmethod
-    def _parse_result(raw: str) -> VerificationResult:
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        if m:
+        # 検証対象の内容を取得
+        # - apply 済み: 実ファイルを読み直す(独立性の担保)
+        # - dry-run:   書き込み予定内容を検証する
+        if result.applied:
             try:
-                data = json.loads(m.group(0))
+                content = security.read_workspace_text(path, self.workspace)
+            except (OSError, security.SecurityError) as e:
                 return VerificationResult(
-                    passed=bool(data.get("passed", False)),
-                    feedback=str(data.get("feedback", "")),
+                    passed=False, feedback=f"成果物ファイルを読み取れません: {e}"
                 )
-            except json.JSONDecodeError:
-                pass
-        # 解析不能な検証結果は安全側(不合格)に倒す
-        logger.warning("検証結果の JSON 解析に失敗。不合格として扱います")
-        return VerificationResult(passed=False, feedback=f"検証結果を解析できません: {raw[:200]}")
+        else:
+            content = result.new_content
+            if content is None:
+                return VerificationResult(
+                    passed=False, feedback="検証対象の内容がありません"
+                )
+
+        # plan.json の verify 条件と照合
+        checks = task.get("verify", {})
+        for needle in checks.get("contains", []):
+            if needle not in content:
+                return VerificationResult(
+                    passed=False, feedback=f"'{needle}' が成果物に含まれていません"
+                )
+        for needle in checks.get("not_contains", []):
+            if needle in content:
+                return VerificationResult(
+                    passed=False, feedback=f"禁止文字列 '{needle}' が成果物に含まれています"
+                )
+
+        # 機密情報が成果物に残っていないことの最終確認
+        if redactor.contains_sensitive(content):
+            return VerificationResult(
+                passed=False,
+                feedback="機密情報らしき文字列が成果物に含まれています",
+            )
+
+        return VerificationResult(passed=True, feedback="全検証条件を満たしています")

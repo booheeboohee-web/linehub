@@ -1,0 +1,27 @@
+{
+  "goal": "作業メモのひな形を workspace 内に整備する",
+  "tasks": [
+    {
+      "action": "write_file",
+      "path": "notes/summary.md",
+      "content": "# 作業サマリ\n\n- 目的:\n- 結果:\n",
+      "verify": {
+        "contains": ["# 作業サマリ"],
+        "not_contains": ["TODO"]
+      }
+    },
+    {
+      "action": "replace_text",
+      "path": "notes/summary.md",
+      "old": "- 目的:",
+      "new": "- 目的: (ここに記入)",
+      "verify": {
+        "contains": ["(ここに記入)"]
+      }
+    },
+    {
+      "action": "human_review",
+      "note": "notes/summary.md の内容を目視で確認する"
+    }
+  ]
+}

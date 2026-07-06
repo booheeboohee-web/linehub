@@ -1,8 +1,10 @@
 """STATE.md の読み書き。
 
-システムの進行状況・タスクキュー・獲得スキル・失敗履歴を
-Markdown セクションとして永続化し、次回ループの CONSULT フェーズで
-プロンプトコンテキストとして再利用する。
+進行状況・タスクキュー・獲得した教訓・失敗履歴・人間確認待ち項目を
+Markdown セクションとして永続化し、次回ループの CONSULT フェーズで参照する。
+
+すべての書き込みは core/redactor.py を通し、メールアドレス・電話番号・
+キー/トークンらしき文字列が STATE.md に保存されないことを保証する。
 """
 
 from __future__ import annotations
@@ -11,25 +13,41 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-SECTIONS = ["Mission", "Current Status", "Task Queue", "Acquired Skills", "Failure Log"]
+from core.redactor import redact
+
+SECTIONS = [
+    "Mission",
+    "Current Status",
+    "Task Queue",
+    "Acquired Skills",
+    "Failure Log",
+    "Pending Human Review",
+]
 
 _TEMPLATE = """# STATE
 
 ## Mission
-{mission}
+{Mission}
 
 ## Current Status
-{current_status}
+{Current Status}
 
 ## Task Queue
-{task_queue}
+{Task Queue}
 
 ## Acquired Skills
-{acquired_skills}
+{Acquired Skills}
 
 ## Failure Log
-{failure_log}
+{Failure Log}
+
+## Pending Human Review
+{Pending Human Review}
 """
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class StateManager:
@@ -49,16 +67,9 @@ class StateManager:
             self.sections[section] = m.group(1).strip() if m else ""
 
     def save(self) -> None:
-        self.path.write_text(
-            _TEMPLATE.format(
-                mission=self.sections["Mission"],
-                current_status=self.sections["Current Status"],
-                task_queue=self.sections["Task Queue"],
-                acquired_skills=self.sections["Acquired Skills"],
-                failure_log=self.sections["Failure Log"],
-            ),
-            encoding="utf-8",
-        )
+        # 書き込み前に必ず redact(機密情報を STATE.md に残さない)
+        rendered = _TEMPLATE.format(**{k: redact(v) for k, v in self.sections.items()})
+        self.path.write_text(rendered, encoding="utf-8")
 
     # ---- 更新 API ---------------------------------------------------
 
@@ -67,8 +78,11 @@ class StateManager:
         self.save()
 
     def update_status(self, phase: str, iteration: int, note: str = "") -> None:
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        lines = [f"- phase: {phase}", f"- iteration: {iteration}", f"- last_updated: {now}"]
+        lines = [
+            f"- phase: {phase}",
+            f"- iteration: {iteration}",
+            f"- last_updated: {_now()}",
+        ]
         if note:
             lines.append(f"- note: {note}")
         self.sections["Current Status"] = "\n".join(lines)
@@ -84,29 +98,40 @@ class StateManager:
 
     def add_skill(self, skill: str) -> None:
         """Distill フェーズで抽出した教訓を追記する(重複はスキップ)。"""
-        existing = self.sections["Acquired Skills"]
-        if skill.strip() in existing:
+        skill = skill.strip()
+        if not skill or skill in self.sections["Acquired Skills"]:
             return
-        entry = f"- {skill.strip()}"
-        self.sections["Acquired Skills"] = f"{existing}\n{entry}".strip()
+        existing = self.sections["Acquired Skills"]
+        self.sections["Acquired Skills"] = f"{existing}\n- {skill}".strip()
         self.save()
 
     def log_failure(self, iteration: int, subtask: str, reason: str) -> None:
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        entry = f"- [{now}] iter={iteration} task='{subtask}' reason: {reason}"
+        entry = f"- [{_now()}] iter={iteration} task='{subtask}' reason: {reason}"
         existing = self.sections["Failure Log"]
         self.sections["Failure Log"] = f"{existing}\n{entry}".strip()
+        self.save()
+
+    def add_pending_review(self, note: str) -> None:
+        """人間確認が必要な項目を記録する(Vision 検証の代替など)。"""
+        entry = f"- [{_now()}] 人間確認が必要: {note}"
+        existing = self.sections["Pending Human Review"]
+        if note in existing:
+            return
+        self.sections["Pending Human Review"] = f"{existing}\n{entry}".strip()
         self.save()
 
     # ---- 参照 API (Consult) -----------------------------------------
 
     def consult(self) -> str:
-        """CONSULT フェーズ用: 過去の教訓と失敗履歴をプロンプト向けに整形。"""
+        """CONSULT フェーズ用: 過去の教訓と失敗履歴を整形して返す。"""
         skills = self.sections["Acquired Skills"] or "(まだありません)"
         failures = self.sections["Failure Log"] or "(まだありません)"
+        pending = self.sections["Pending Human Review"] or "(なし)"
         return (
-            "## 過去に獲得した教訓(必ず考慮すること)\n"
+            "## 過去に獲得した教訓\n"
             f"{skills}\n\n"
             "## 直近の失敗履歴\n"
-            f"{failures}"
+            f"{failures}\n\n"
+            "## 人間確認待ち\n"
+            f"{pending}"
         )

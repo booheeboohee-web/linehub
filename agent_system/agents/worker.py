@@ -1,33 +1,47 @@
-"""Worker: 安価・高速モデルによる作業エージェント。
+"""Worker: サブタスクのローカル実行(完全ローカル)。
 
-Orchestrator が分割したサブタスクを 1 件ずつ実行する。
-セーフティ拒否や恒久エラー時は base.py のフォールバックチェーンにより
-上位モデル (claude-sonnet-5) へ自動で切り替わる。
+plan.json に定義された宣言的なタスクを core/safe_file_ops.py 経由で実行する。
+- 編集は workspace/ 配下のみ、デフォルト dry-run、--apply 時のみ実編集
+- human_review タスクは何も実行せず「人間確認が必要」と記録するだけ
 """
 
 from __future__ import annotations
 
-from agents.base import BaseAgent
+import logging
+
+from core.safe_file_ops import FileOpResult, SafeFileOps
+
+logger = logging.getLogger(__name__)
 
 
-class Worker(BaseAgent):
-    role = "worker"
-    system_prompt = (
-        "あなたは自律型エージェントシステムの Worker(作業担当)です。"
-        "与えられたサブタスクを 1 件だけ、確実に実行してください。"
-        "余計な前置きは不要で、成果物のみを出力してください。"
-    )
+class Worker:
+    """作業担当: 宣言的タスクを安全なファイル操作に変換して実行する。"""
 
-    def execute(self, subtask: str, goal: str, state_context: str, hint: str = "") -> str:
-        """サブタスクを実行し、成果物テキストを返す。
+    def __init__(self, file_ops: SafeFileOps):
+        self.file_ops = file_ops
 
-        hint には Investigate フェーズで得た「次の試行で変えるべき点」を渡す。
-        """
-        parts = [
-            f"# 最終ゴール\n{goal}",
-            f"# 実行するサブタスク\n{subtask}",
-            f"# 参照情報(過去の教訓)\n{state_context}",
-        ]
-        if hint:
-            parts.append(f"# 前回失敗からの改善指示\n{hint}")
-        return self._call("\n\n".join(parts))
+    def execute(self, task: dict) -> FileOpResult:
+        action = task["action"]
+        logger.info("Worker 実行: action=%s path=%s", action, task.get("path", "-"))
+
+        if action == "write_file":
+            return self.file_ops.write_file(task["path"], task["content"])
+        if action == "append_file":
+            return self.file_ops.append_file(task["path"], task["content"])
+        if action == "replace_text":
+            return self.file_ops.replace_text(task["path"], task["old"], task["new"])
+        if action == "human_review":
+            # 自動処理は行わない。ログと結果に「人間確認が必要」と残すのみ。
+            note = task["note"]
+            logger.warning("人間確認が必要: %s", note)
+            return FileOpResult(
+                ok=True,
+                action="human_review",
+                path="-",
+                detail=f"人間確認が必要: {note}",
+            )
+
+        return FileOpResult(
+            ok=False, action=action, path=task.get("path", "-"),
+            detail=f"未対応のアクション: {action}",
+        )

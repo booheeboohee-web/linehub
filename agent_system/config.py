@@ -1,65 +1,33 @@
-"""モデルルーティング設定。
+"""設定。
 
-役割ごとに使用モデルと生成パラメータを定義する。
-- Orchestrator / Verifier: 高知能モデル (claude-opus-4-8, adaptive thinking)
-- Worker: 安価・高速モデル (claude-haiku-4-5)
-
-`fallbacks` は、セーフティ拒否やモデル固有の恒久エラー発生時に
-順番に試行される代替モデル設定。
+このシステムは完全ローカル動作です。
+- 外部 API / ネットワーク通信は一切行いません
+- 課金が発生する要素はありません(標準ライブラリのみで動作)
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent
 
-@dataclass(frozen=True)
-class ModelConfig:
-    """1 モデル分の呼び出し設定。"""
+# 編集可能範囲は workspace/ 配下のみ
+WORKSPACE_DIR = BASE_DIR / "workspace"
 
-    model: str
-    max_tokens: int = 4096
-    # claude-opus-4-8 系は adaptive thinking のみサポート
-    # (budget_tokens / temperature / top_p は 400 になるため使わない)
-    thinking: dict[str, Any] | None = None
-    effort: str | None = None  # low | medium | high | xhigh | max
+# 実編集(--apply)前のバックアップ先
+BACKUP_DIR = BASE_DIR / "backups"
 
+# 実行ログ(書き込み前に必ず redact される)
+LOG_DIR = BASE_DIR / "logs"
 
-# 役割 → プライマリ設定
-MODEL_ROUTING: dict[str, ModelConfig] = {
-    "orchestrator": ModelConfig(
-        model="claude-opus-4-8",
-        max_tokens=16000,
-        thinking={"type": "adaptive"},
-        effort="high",
-    ),
-    "worker": ModelConfig(
-        model="claude-haiku-4-5",
-        max_tokens=4096,
-    ),
-    "verifier": ModelConfig(
-        model="claude-opus-4-8",
-        max_tokens=8000,
-        thinking={"type": "adaptive"},
-        effort="medium",
-    ),
-}
+# 状態ファイル(書き込み前に必ず redact される)
+STATE_FILE = BASE_DIR / "STATE.md"
 
-# 役割 → フォールバックチェーン(先頭から順に試行)
-FALLBACK_ROUTING: dict[str, list[ModelConfig]] = {
-    # Worker が拒否/恒久エラーとなった場合は上位モデルで救済
-    "worker": [
-        ModelConfig(model="claude-sonnet-5", max_tokens=4096),
-    ],
-    "orchestrator": [],
-    "verifier": [],
-}
+# タスク計画ファイル(人間が編集する)
+DEFAULT_PLAN_FILE = WORKSPACE_DIR / "plan.json"
 
-# リトライ設定(一時的エラー: 429 / 5xx / 接続断)
-MAX_RETRIES = 4
-BACKOFF_BASE_SECONDS = 2.0  # 2, 4, 8, 16 秒
+# 同一タスクの連続失敗がこの回数に達したら必ず停止して人間確認を求める
+MAX_CONSECUTIVE_FAILURES = 3
 
-# ループ設定
-DEFAULT_MAX_ITERATIONS = 10
-STATE_FILE = "STATE.md"
+# ループ全体の安全弁
+DEFAULT_MAX_ITERATIONS = 50

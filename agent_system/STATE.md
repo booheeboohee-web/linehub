@@ -1,7 +1,7 @@
 # STATE
 
 ## Mission
-(未設定 — main.py の --goal で設定されます)
+(未設定 — workspace/plan.json の goal から設定されます)
 
 ## Current Status
 - phase: IDLE
@@ -13,3 +13,5 @@
 ## Acquired Skills
 
 ## Failure Log
+
+## Pending Human Review
