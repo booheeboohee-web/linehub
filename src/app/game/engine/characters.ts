@@ -94,6 +94,7 @@ export interface CharDef {
   widthScale: number // 体型(横幅)
   skin: string
   hair: string
+  hairRoot?: string // 根元の地毛色(染めキャラの二層表現)
   hairStyle: HairStyle
   shirt: string
   pants: string
@@ -220,7 +221,8 @@ export const CHARACTERS: CharDef[] = [
     jumpV: 10,
     widthScale: 1.35,
     skin: '#f0c8a0',
-    hair: '#4a3222',
+    hair: '#e8a99a',
+    hairRoot: '#241f1c',
     hairStyle: 'bob',
     shirt: '#b8506e',
     pants: '#3d3d6b',
@@ -703,9 +705,9 @@ export const CHARACTERS: CharDef[] = [
     skin: '#f0c8a0',
     hair: '#1c1c1c',
     hairStyle: 'buzz',
-    shirt: '#c0392b',
+    shirt: '#f6c445',
     pants: '#34495e',
-    accent: '#e74c3c',
+    accent: '#f6c445',
     punch: basePunch(),
     kick: {
       ...baseKick('タックル', 52),

@@ -1878,6 +1878,15 @@ export function drawCharacter(
       break
   }
 
+  // 根元の地毛(染めキャラの二層表現)
+  if (d.hairRoot) {
+    ctx.strokeStyle = d.hairRoot
+    ctx.lineWidth = u * 0.32
+    ctx.beginPath()
+    ctx.arc(lean, headY - headR * 0.08, headR * 0.92, Math.PI * 0.88, Math.PI * 1.4)
+    ctx.stroke()
+  }
+
   // 目
   ctx.fillStyle = '#1c1917'
   if (pose === 'ko') {
