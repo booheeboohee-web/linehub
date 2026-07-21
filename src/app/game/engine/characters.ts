@@ -1,0 +1,759 @@
+// 家族格闘ゲーム キャラクターデータ(引き継ぎ資料準拠)
+
+export type StatusKind =
+  | 'stun' // 気絶: 動けない
+  | 'confuse' // 錯乱: 操作反転
+  | 'charm' // メロメロ: 攻撃不可
+  | 'blind' // 目潰し: 画面が暗くなる
+  | 'root' // スタン: 移動不可(攻撃は可)
+  | 'atkDown' // 攻撃力低下
+  | 'defDown' // 防御力低下
+  | 'bind' // 拘束: 動けない+継続ダメージ
+  | 'bleed' // 出血: 継続ダメージ
+  | 'burn' // 火傷: 継続ダメージ
+
+export const STATUS_INFO: Record<StatusKind, { label: string; icon: string }> = {
+  stun: { label: '気絶', icon: '💫' },
+  confuse: { label: '錯乱', icon: '🌀' },
+  charm: { label: 'メロメロ', icon: '💕' },
+  blind: { label: '目潰し', icon: '🕶️' },
+  root: { label: 'スタン', icon: '⛓️' },
+  atkDown: { label: '攻撃力低下', icon: '📉' },
+  defDown: { label: '防御力低下', icon: '🛡️' },
+  bind: { label: '拘束', icon: '🪢' },
+  bleed: { label: '出血', icon: '🩸' },
+  burn: { label: '火傷', icon: '🔥' },
+}
+
+export type ProjectileKind =
+  | 'table' // ちゃぶ台
+  | 'paper' // かまいたち
+  | 'cosme' // コスメ
+  | 'coin' // コイン
+  | 'booger' // はなくそ
+  | 'bug' // バッタ
+  | 'shock' // 電光石火
+  | 'car' // 車
+
+export interface StatusApply {
+  kind: StatusKind
+  dur: number // 秒
+}
+
+export interface ProjectileDef {
+  kind: ProjectileKind
+  speed: number
+  w: number
+  h: number
+  yOff: number // 地面からの高さ(発射位置)
+  count?: number // 連射数
+  interval?: number // 連射間隔(フレーム)
+  pierce?: boolean
+  spread?: number // 上下ばらつき
+}
+
+export type MoveType = 'strike' | 'projectile' | 'grab' | 'aura' | 'barrier' | 'taunt'
+
+export interface MoveDef {
+  name: string
+  type: MoveType
+  damage: number
+  startup: number // フレーム
+  active: number
+  recovery: number
+  range: number // 打撃/掴みのリーチ(px)
+  hbH?: number // ヒットボックス高さ
+  kb: number // ノックバック
+  launch?: number // 打ち上げ
+  hits?: number // 多段ヒット数
+  hitInterval?: number
+  status?: StatusApply // 相手に付与
+  selfStatus?: StatusApply
+  dot?: { dps: number; dur: number; kind: StatusKind }
+  projectile?: ProjectileDef
+  lunge?: { vx: number; vy?: number } // 突進系の自機移動
+  meterCost?: number
+  shake?: number // 画面揺れ
+  banner?: boolean // 技名を大きく表示
+  desc?: string
+}
+
+export type HairStyle = 'grandpa' | 'short' | 'long' | 'bob' | 'ponytail' | 'buzz' | 'twintail'
+
+export interface CharDef {
+  id: string
+  name: string
+  age: number
+  sex: '男' | '女'
+  heightCm: number
+  weightKg: number
+  typeDesc: string
+  hp: number
+  speed: number // 歩行速度 px/frame
+  jumpV: number
+  widthScale: number // 体型(横幅)
+  skin: string
+  hair: string
+  hairStyle: HairStyle
+  shirt: string
+  pants: string
+  accent: string // テーマカラー(UI/選択画面)
+  punch: MoveDef
+  kick: MoveDef
+  grab: MoveDef
+  unique: MoveDef // 特殊攻撃ボタン
+  sp1: MoveDef // 必殺技(ゲージ50)
+  sp2: MoveDef // 超必殺技(ゲージ100)
+}
+
+const basePunch = (name = 'パンチ', damage = 32): MoveDef => ({
+  name,
+  type: 'strike',
+  damage,
+  startup: 5,
+  active: 5,
+  recovery: 8,
+  range: 58,
+  kb: 3,
+})
+
+const baseKick = (name = 'キック', damage = 46): MoveDef => ({
+  name,
+  type: 'strike',
+  damage,
+  startup: 8,
+  active: 6,
+  recovery: 12,
+  range: 70,
+  kb: 4.5,
+})
+
+const baseGrab = (name = '投げる', damage = 90): MoveDef => ({
+  name,
+  type: 'grab',
+  damage,
+  startup: 6,
+  active: 4,
+  recovery: 16,
+  range: 52,
+  kb: 8,
+  launch: 7,
+  shake: 6,
+})
+
+export const CHARACTERS: CharDef[] = [
+  {
+    id: 'atsushi',
+    name: 'アツシ',
+    age: 73,
+    sex: '男',
+    heightCm: 178,
+    weightKg: 70,
+    typeDesc: 'パワー系おじいちゃん・電気属性',
+    hp: 1050,
+    speed: 2.2,
+    jumpV: 11,
+    widthScale: 1.0,
+    skin: '#e8b88a',
+    hair: '#cfcfcf',
+    hairStyle: 'grandpa',
+    shirt: '#7a5c3e',
+    pants: '#4a4a55',
+    accent: '#f4c430',
+    punch: basePunch('ゲンコツ', 38),
+    kick: baseKick(),
+    grab: baseGrab(),
+    unique: {
+      name: 'ちゃぶ台返し',
+      type: 'projectile',
+      damage: 60,
+      startup: 14,
+      active: 2,
+      recovery: 20,
+      range: 0,
+      kb: 6,
+      projectile: { kind: 'table', speed: 6.5, w: 64, h: 40, yOff: 70 },
+      desc: 'テーブルを飛ばす飛び道具',
+    },
+    sp1: {
+      name: '電光石火',
+      type: 'projectile',
+      damage: 110,
+      startup: 18,
+      active: 2,
+      recovery: 24,
+      range: 0,
+      kb: 4,
+      status: { kind: 'stun', dur: 2.0 },
+      projectile: { kind: 'shock', speed: 10, w: 90, h: 30, yOff: 16, pierce: true },
+      meterCost: 50,
+      shake: 5,
+      banner: true,
+      desc: '地面に高圧電流。ダメージ+気絶',
+    },
+    sp2: {
+      name: 'デンドラ攻撃',
+      type: 'grab',
+      damage: 230,
+      startup: 10,
+      active: 6,
+      recovery: 24,
+      range: 78,
+      kb: 10,
+      launch: 8,
+      meterCost: 100,
+      shake: 12,
+      banner: true,
+      desc: '電気ドライバーで穴を開ける。超大ダメージ',
+    },
+  },
+  {
+    id: 'naoko',
+    name: 'ナオコ',
+    age: 43,
+    sex: '女',
+    heightCm: 170,
+    weightKg: 80,
+    typeDesc: 'パワー+グラップラー・重量級',
+    hp: 1150,
+    speed: 2.0,
+    jumpV: 10,
+    widthScale: 1.35,
+    skin: '#f0c8a0',
+    hair: '#4a3222',
+    hairStyle: 'bob',
+    shirt: '#b8506e',
+    pants: '#3d3d6b',
+    accent: '#e75480',
+    punch: basePunch(),
+    kick: baseKick(),
+    grab: baseGrab(),
+    unique: {
+      name: 'タンクローリー',
+      type: 'strike',
+      damage: 18,
+      startup: 12,
+      active: 36,
+      recovery: 18,
+      range: 60,
+      hbH: 60,
+      kb: 3,
+      hits: 3,
+      hitInterval: 12,
+      lunge: { vx: 4.2 },
+      desc: '寝転がって転がる。連続ダメージ',
+    },
+    sp1: {
+      name: 'ヒップアタック',
+      type: 'strike',
+      damage: 140,
+      startup: 12,
+      active: 14,
+      recovery: 20,
+      range: 74,
+      kb: 14,
+      launch: 6,
+      lunge: { vx: 5 },
+      meterCost: 50,
+      shake: 8,
+      banner: true,
+      desc: 'どでかいケツで吹き飛ばす',
+    },
+    sp2: {
+      name: 'ジャーマンスープレックス',
+      type: 'grab',
+      damage: 240,
+      startup: 8,
+      active: 6,
+      recovery: 26,
+      range: 70,
+      kb: 9,
+      launch: 10,
+      meterCost: 100,
+      shake: 14,
+      banner: true,
+      desc: '掴んで後方に投げる。超大ダメージ',
+    },
+  },
+  {
+    id: 'reisa',
+    name: 'レイサ',
+    age: 16,
+    sex: '女',
+    heightCm: 164,
+    weightKg: 60,
+    typeDesc: 'スピード+キック特化',
+    hp: 950,
+    speed: 3.4,
+    jumpV: 12.5,
+    widthScale: 0.9,
+    skin: '#f2cfa8',
+    hair: '#2d2320',
+    hairStyle: 'ponytail',
+    shirt: '#3aa66a',
+    pants: '#22223a',
+    accent: '#2ecc71',
+    punch: basePunch(),
+    kick: {
+      ...baseKick('膝蹴り', 55),
+      range: 62,
+      startup: 6,
+    },
+    grab: baseGrab(),
+    unique: {
+      name: '洗濯物アタック',
+      type: 'barrier',
+      damage: 20,
+      startup: 10,
+      active: 150,
+      recovery: 14,
+      range: 90,
+      kb: 11,
+      desc: '洗濯物をバタバタ。触ると飛ばされる',
+    },
+    sp1: {
+      name: 'かかと落とし',
+      type: 'strike',
+      damage: 120,
+      startup: 14,
+      active: 8,
+      recovery: 18,
+      range: 72,
+      kb: 3,
+      status: { kind: 'root', dur: 3.0 },
+      meterCost: 50,
+      shake: 7,
+      banner: true,
+      desc: '地面に食い込む。相手はしばらく動けない',
+    },
+    sp2: {
+      name: '百烈キック',
+      type: 'strike',
+      damage: 30,
+      startup: 8,
+      active: 40,
+      recovery: 20,
+      range: 76,
+      kb: 2,
+      hits: 8,
+      hitInterval: 5,
+      meterCost: 100,
+      shake: 6,
+      banner: true,
+      desc: '一発で100発分の破壊力',
+    },
+  },
+  {
+    id: 'shion',
+    name: 'シオン',
+    age: 14,
+    sex: '女',
+    heightCm: 162,
+    weightKg: 40,
+    typeDesc: 'トリッキー+状態異常特化・軽量級',
+    hp: 850,
+    speed: 3.0,
+    jumpV: 12,
+    widthScale: 0.8,
+    skin: '#f5d7b5',
+    hair: '#5b4636',
+    hairStyle: 'twintail',
+    shirt: '#9b59b6',
+    pants: '#e8e4f0',
+    accent: '#b57edc',
+    punch: {
+      ...basePunch('ぶっさす', 20),
+      startup: 3,
+      recovery: 5,
+      desc: 'シャーペンを刺す。連続ヒット可能',
+    },
+    kick: baseKick(),
+    grab: baseGrab(),
+    unique: {
+      name: 'かまいたち',
+      type: 'projectile',
+      damage: 35,
+      startup: 10,
+      active: 2,
+      recovery: 16,
+      range: 0,
+      kb: 3,
+      dot: { dps: 12, dur: 4, kind: 'bleed' },
+      projectile: { kind: 'paper', speed: 8.5, w: 40, h: 14, yOff: 66 },
+      desc: '紙を高速で飛ばす。皮膚が切れる(出血)',
+    },
+    sp1: {
+      name: 'メロメロ',
+      type: 'aura',
+      damage: 0,
+      startup: 12,
+      active: 6,
+      recovery: 22,
+      range: 210,
+      kb: 0,
+      status: { kind: 'charm', dur: 4.0 },
+      meterCost: 50,
+      banner: true,
+      desc: '可愛いオーラ。相手は攻撃できなくなる',
+    },
+    sp2: {
+      name: '怒りの怒号',
+      type: 'aura',
+      damage: 210,
+      startup: 14,
+      active: 6,
+      recovery: 24,
+      range: 250,
+      kb: 9,
+      launch: 5,
+      meterCost: 100,
+      shake: 12,
+      banner: true,
+      desc: '叫ぶと脳天直撃。大ダメージ',
+    },
+  },
+  {
+    id: 'ao',
+    name: 'アオ',
+    age: 21,
+    sex: '男',
+    heightCm: 170,
+    weightKg: 60,
+    typeDesc: 'バランス型・突進系',
+    hp: 1000,
+    speed: 2.8,
+    jumpV: 11.5,
+    widthScale: 1.0,
+    skin: '#eab98c',
+    hair: '#1e1a18',
+    hairStyle: 'short',
+    shirt: '#2e6fd8',
+    pants: '#2b2b2b',
+    accent: '#3b82f6',
+    punch: basePunch('正拳突き', 40),
+    kick: baseKick(),
+    grab: baseGrab(),
+    unique: {
+      name: 'ドロップキック',
+      type: 'strike',
+      damage: 70,
+      startup: 10,
+      active: 18,
+      recovery: 20,
+      range: 70,
+      kb: 8,
+      lunge: { vx: 6, vy: -7 },
+      desc: 'ジャンプして両足キック',
+    },
+    sp1: {
+      name: 'ラリアット',
+      type: 'strike',
+      damage: 150,
+      startup: 10,
+      active: 20,
+      recovery: 18,
+      range: 66,
+      kb: 12,
+      launch: 5,
+      lunge: { vx: 7.5 },
+      meterCost: 50,
+      shake: 8,
+      banner: true,
+      desc: '腕を広げて突進。大ダメージ',
+    },
+    sp2: {
+      name: '車で轢き殺す',
+      type: 'projectile',
+      damage: 260,
+      startup: 24,
+      active: 2,
+      recovery: 30,
+      range: 0,
+      kb: 15,
+      launch: 9,
+      projectile: { kind: 'car', speed: 13, w: 170, h: 84, yOff: 42, pierce: true },
+      meterCost: 100,
+      shake: 14,
+      banner: true,
+      desc: '車で突進する超必殺技(ジャンプで回避可)',
+    },
+  },
+  {
+    id: 'emma',
+    name: 'エマ',
+    age: 19,
+    sex: '女',
+    heightCm: 150,
+    weightKg: 50,
+    typeDesc: 'デバフ+状態異常特化・小柄で素早い',
+    hp: 900,
+    speed: 3.2,
+    jumpV: 12,
+    widthScale: 0.85,
+    skin: '#f6d3ae',
+    hair: '#8a5a2b',
+    hairStyle: 'long',
+    shirt: '#f39c12',
+    pants: '#f8f0e3',
+    accent: '#ff8c42',
+    punch: basePunch(),
+    kick: {
+      ...baseKick('アイプチ目潰し', 30),
+      status: { kind: 'blind', dur: 1.6 },
+      desc: 'ヒットすると相手の画面が暗くなる',
+    },
+    grab: baseGrab(),
+    unique: {
+      name: 'コスメアタック',
+      type: 'projectile',
+      damage: 22,
+      startup: 8,
+      active: 2,
+      recovery: 18,
+      range: 0,
+      kb: 2,
+      projectile: { kind: 'cosme', speed: 7.5, w: 22, h: 22, yOff: 70, count: 3, interval: 7, spread: 18 },
+      desc: '化粧品を次々と飛ばす。連続ヒット',
+    },
+    sp1: {
+      name: 'メンチ切り',
+      type: 'aura',
+      damage: 0,
+      startup: 10,
+      active: 6,
+      recovery: 20,
+      range: 240,
+      kb: 0,
+      status: { kind: 'confuse', dur: 3.5 },
+      meterCost: 50,
+      banner: true,
+      desc: '睨みつける。相手は錯乱状態に',
+    },
+    sp2: {
+      name: 'ヘアーロープ',
+      type: 'grab',
+      damage: 130,
+      startup: 12,
+      active: 8,
+      recovery: 24,
+      range: 150,
+      kb: 4,
+      status: { kind: 'stun', dur: 2.5 },
+      meterCost: 100,
+      shake: 8,
+      banner: true,
+      desc: '髪の毛で縛り付けて気絶させる',
+    },
+  },
+  {
+    id: 'natsuko',
+    name: 'ナツコ',
+    age: 39,
+    sex: '女',
+    heightCm: 162,
+    weightKg: 60,
+    typeDesc: 'グラップラー+デバフ',
+    hp: 1000,
+    speed: 2.5,
+    jumpV: 11,
+    widthScale: 1.0,
+    skin: '#f0c8a0',
+    hair: '#3b2a1e',
+    hairStyle: 'bob',
+    shirt: '#16a085',
+    pants: '#5d4157',
+    accent: '#1abc9c',
+    punch: {
+      ...basePunch('罵倒', 26),
+      range: 96,
+      status: { kind: 'atkDown', dur: 4.0 },
+      desc: '馬鹿にして凹ませる。攻撃力低下',
+    },
+    kick: baseKick(),
+    grab: baseGrab(),
+    unique: {
+      name: 'はなくそ',
+      type: 'projectile',
+      damage: 25,
+      startup: 10,
+      active: 2,
+      recovery: 18,
+      range: 0,
+      kb: 2,
+      status: { kind: 'confuse', dur: 3.0 },
+      projectile: { kind: 'booger', speed: 7, w: 14, h: 14, yOff: 78 },
+      desc: '当たると錯乱状態(操作反転)',
+    },
+    sp1: {
+      name: 'コブラツイスト',
+      type: 'grab',
+      damage: 70,
+      startup: 8,
+      active: 6,
+      recovery: 22,
+      range: 64,
+      kb: 5,
+      dot: { dps: 25, dur: 3, kind: 'bind' },
+      status: { kind: 'bind', dur: 2.2 },
+      meterCost: 50,
+      shake: 6,
+      banner: true,
+      desc: '掴んで締め上げる。継続ダメージ',
+    },
+    sp2: {
+      name: '食洗機詰め',
+      type: 'grab',
+      damage: 240,
+      startup: 10,
+      active: 6,
+      recovery: 28,
+      range: 70,
+      kb: 8,
+      launch: 6,
+      dot: { dps: 15, dur: 3, kind: 'burn' },
+      meterCost: 100,
+      shake: 14,
+      banner: true,
+      desc: '食洗機に入れる。重度の火傷',
+    },
+  },
+  {
+    id: 'yocchan',
+    name: 'ヨッちゃん',
+    age: 41,
+    sex: '男',
+    heightCm: 174,
+    weightKg: 60,
+    typeDesc: 'リーチ+トリッキー',
+    hp: 1000,
+    speed: 2.6,
+    jumpV: 11.5,
+    widthScale: 0.95,
+    skin: '#e6b183',
+    hair: '#2a2a2a',
+    hairStyle: 'buzz',
+    shirt: '#444c56',
+    pants: '#7d6b58',
+    accent: '#94a3b8',
+    punch: {
+      ...basePunch('さおふり', 42),
+      startup: 9,
+      recovery: 13,
+      range: 120,
+      desc: '竿を振る。リーチが非常に長い',
+    },
+    kick: baseKick(),
+    grab: baseGrab(),
+    unique: {
+      name: 'コイン投げ',
+      type: 'projectile',
+      damage: 12,
+      startup: 8,
+      active: 2,
+      recovery: 20,
+      range: 0,
+      kb: 1.5,
+      projectile: { kind: 'coin', speed: 9, w: 12, h: 12, yOff: 74, count: 5, interval: 4, spread: 26 },
+      desc: 'コインを大量に投げる弾幕',
+    },
+    sp1: {
+      name: 'ヨーヨーアタック',
+      type: 'grab',
+      damage: 130,
+      startup: 12,
+      active: 8,
+      recovery: 22,
+      range: 180,
+      kb: 3,
+      status: { kind: 'bind', dur: 2.0 },
+      dot: { dps: 15, dur: 2, kind: 'bind' },
+      meterCost: 50,
+      shake: 6,
+      banner: true,
+      desc: 'ヨーヨーで絡めて動けなくする',
+    },
+    sp2: {
+      name: '引き摺り',
+      type: 'grab',
+      damage: 250,
+      startup: 12,
+      active: 8,
+      recovery: 30,
+      range: 110,
+      kb: 13,
+      launch: 7,
+      meterCost: 100,
+      shake: 14,
+      banner: true,
+      desc: 'バイクで相手を引き摺る。超大ダメージ',
+    },
+  },
+  {
+    id: 'bou',
+    name: '坊',
+    age: 13,
+    sex: '男',
+    heightCm: 170,
+    weightKg: 75,
+    typeDesc: 'パワー+状態異常・重量級少年',
+    hp: 1100,
+    speed: 2.4,
+    jumpV: 10.5,
+    widthScale: 1.25,
+    skin: '#f0c8a0',
+    hair: '#1c1c1c',
+    hairStyle: 'buzz',
+    shirt: '#c0392b',
+    pants: '#34495e',
+    accent: '#e74c3c',
+    punch: basePunch(),
+    kick: {
+      ...baseKick('タックル', 52),
+      lunge: { vx: 4 },
+      desc: '突進攻撃',
+    },
+    grab: baseGrab(),
+    unique: {
+      name: '煽る',
+      type: 'taunt',
+      damage: 0,
+      startup: 12,
+      active: 6,
+      recovery: 20,
+      range: 260,
+      kb: 0,
+      status: { kind: 'defDown', dur: 5.0 },
+      desc: '相手の防御力が下がる(挑発デバフ)',
+    },
+    sp1: {
+      name: 'バッタ投げ',
+      type: 'projectile',
+      damage: 140,
+      startup: 14,
+      active: 2,
+      recovery: 22,
+      range: 0,
+      kb: 6,
+      projectile: { kind: 'bug', speed: 6, w: 80, h: 60, yOff: 80, pierce: true },
+      meterCost: 50,
+      shake: 5,
+      banner: true,
+      desc: '大量のバッタを投げる。大ダメージ',
+    },
+    sp2: {
+      name: '体臭攻撃',
+      type: 'aura',
+      damage: 180,
+      startup: 16,
+      active: 8,
+      recovery: 26,
+      range: 230,
+      kb: 7,
+      status: { kind: 'stun', dur: 2.0 },
+      meterCost: 100,
+      shake: 10,
+      banner: true,
+      desc: '激臭を放つ。大ダメージ+気絶',
+    },
+  },
+]
