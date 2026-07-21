@@ -1,7 +1,7 @@
 // 家族格闘ゲーム エンジン本体
 // 外部ライブラリ不使用。Canvas 2D + 固定タイムステップ(60fps)
 
-import { CHARACTERS, CharDef, MoveDef, StatusKind, STATUS_INFO, ProjectileKind } from './characters'
+import { CHARACTERS, CharDef, MoveDef, StatusKind, STATUS_INFO, ProjectileKind, ARCADE_QUEUE } from './characters'
 import { AudioMan } from './audio'
 
 export const VIEW_W = 960
@@ -236,6 +236,8 @@ export class Game {
   private picked: [number, number] = [-1, -1]
   private resultCursor = 0
   private tapRects: { rect: Rect; act: () => void }[] = []
+  private isArcade = false
+  private arcadeIndex = 0
 
   // バトル系
   private fighters: [Fighter, Fighter] | null = null
@@ -243,6 +245,7 @@ export class Game {
   private phaseT = 0
   private timer = ROUND_TIME * 60
   private roundNo = 1
+  private roundsToWin = ROUNDS_TO_WIN
   private wins: [number, number] = [0, 0]
   private projectiles: Projectile[] = []
   private barriers: Barrier[] = []
@@ -356,16 +359,18 @@ export class Game {
     this.picker = 0
     this.picked = [-1, -1]
     this.selCursor = [0, 4]
+    if (this.isArcade) this.arcadeIndex = 0
     this.audio.sfx('confirm')
   }
 
   private startMatch() {
     const d0 = CHARACTERS[this.picked[0]]
-    const d1 = CHARACTERS[this.picked[1]]
+    const d1 = this.isArcade ? ARCADE_QUEUE[this.arcadeIndex] : CHARACTERS[this.picked[1]]
     this.fighters = [new Fighter(d0, 0), new Fighter(d1, 1)]
     this.wins = [0, 0]
     this.roundNo = 1
     this.matchWinner = -1
+    this.roundsToWin = this.isArcade ? 1 : ROUNDS_TO_WIN
     this.startRound()
     this.screen = 'battle'
     this.audio.sfx('super')
@@ -394,6 +399,7 @@ export class Game {
 
   private gotoTitle() {
     this.screen = 'title'
+    this.isArcade = false
     this.audio.stopBgm()
   }
 
@@ -441,14 +447,24 @@ export class Game {
 
   private updateMode() {
     const [i1, i2] = this.inputs
-    if (i1.press.up || i1.press.down || i2.press.up || i2.press.down) {
-      this.modeCursor = 1 - this.modeCursor
+    if (i1.press.up || i2.press.up) {
+      this.modeCursor = (this.modeCursor + 2) % 3
+      this.audio.sfx('select')
+    }
+    if (i1.press.down || i2.press.down) {
+      this.modeCursor = (this.modeCursor + 1) % 3
       this.audio.sfx('select')
     }
     if (i1.press.punch || i1.press.special || i2.press.punch || i2.press.special) {
-      this.vsCpu = this.modeCursor === 0
-      this.gotoSelect()
+      this.selectMode(this.modeCursor)
     }
+  }
+
+  private selectMode(idx: number) {
+    this.modeCursor = idx
+    this.isArcade = idx === 2
+    this.vsCpu = idx !== 1
+    this.gotoSelect()
   }
 
   // ---------- キャラ選択 ----------
@@ -481,6 +497,11 @@ export class Game {
   private confirmSelect(idx: number) {
     this.picked[this.picker] = idx
     this.audio.sfx('confirm')
+    if (this.picker === 0 && this.isArcade) {
+      this.arcadeIndex = 0
+      this.startMatch()
+      return
+    }
     if (this.picker === 0) {
       this.picker = 1
       if (this.selCursor[1] === this.selCursor[0]) this.selCursor[1] = (idx + 1) % 9
@@ -529,9 +550,14 @@ export class Game {
       for (const f of this.fighters) this.physicsOnly(f)
       if (this.phaseT > 150) {
         if (this.roundWinner >= 0) this.wins[this.roundWinner]++
-        if (this.roundWinner >= 0 && this.wins[this.roundWinner] >= ROUNDS_TO_WIN) {
+        if (this.roundWinner >= 0 && this.wins[this.roundWinner] >= this.roundsToWin) {
           this.matchWinner = this.roundWinner
-          this.gotoResult()
+          if (this.isArcade && this.matchWinner === 0 && this.arcadeIndex < ARCADE_QUEUE.length - 1) {
+            this.arcadeIndex++
+            this.startMatch()
+          } else {
+            this.gotoResult()
+          }
         } else {
           this.roundNo++
           this.startRound()
@@ -1056,7 +1082,8 @@ export class Game {
     if (this.aiActT <= 0) {
       // 新しい行動を決定
       const dist = Math.abs(me.x - foe.x)
-      const r = Math.random()
+      const aggro = me.def.isBoss || me.def.isMidBoss ? 0.3 : me.def.species === 'cat' ? 0.12 : 0
+      const r = Math.random() * (1 - aggro)
       const act: Partial<InputState> = {}
       const toward = foe.x > me.x ? 'right' : 'left'
       const away = foe.x > me.x ? 'left' : 'right'
@@ -1252,33 +1279,30 @@ export class Game {
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)
     ctx.textAlign = 'center'
     ctx.fillStyle = '#ffffff'
-    ctx.font = this.font(40)
-    ctx.fillText('モードせんたく', VIEW_W / 2, 130)
+    ctx.font = this.font(34)
+    ctx.fillText('モードせんたく', VIEW_W / 2, 96)
 
-    const items = ['1P vs CPU', '1P vs 2P (ローカル対戦)']
+    const items = ['1P vs CPU', '1P vs 2P (ローカル対戦)', 'アーケード(強敵に挑戦!)']
     items.forEach((label, i) => {
-      const y = 230 + i * 90
-      const rect: Rect = { x: VIEW_W / 2 - 220, y: y - 44, w: 440, h: 66 }
+      const y = 170 + i * 80
+      const rect: Rect = { x: VIEW_W / 2 - 240, y: y - 36, w: 480, h: 58 }
       ctx.fillStyle = this.modeCursor === i ? '#dc2626' : 'rgba(255,255,255,0.12)'
       ctx.fillRect(rect.x, rect.y, rect.w, rect.h)
-      ctx.strokeStyle = '#ffffff'
+      ctx.strokeStyle = i === 2 ? '#c9a227' : '#ffffff'
       ctx.lineWidth = 3
       ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
       ctx.fillStyle = '#ffffff'
-      ctx.font = this.font(30)
+      ctx.font = this.font(26)
       ctx.fillText(label, VIEW_W / 2, y)
       this.tapRects.push({
         rect,
-        act: () => {
-          this.modeCursor = i
-          this.vsCpu = i === 0
-          this.gotoSelect()
-        },
+        act: () => this.selectMode(i),
       })
     })
-    ctx.font = this.font(17, false)
+    ctx.font = this.font(15, false)
     ctx.fillStyle = '#cbd5e1'
-    ctx.fillText('スマホは 1P vs CPU がおすすめ(タップで決定)', VIEW_W / 2, 440)
+    ctx.fillText('アーケードは猫や強敵を倒してラスボス「道代」を目指すモード', VIEW_W / 2, 430)
+    ctx.fillText('スマホは 1P vs CPU がおすすめ(タップで決定)', VIEW_W / 2, 452)
     ctx.textAlign = 'left'
   }
 
@@ -1446,13 +1470,29 @@ export class Game {
     // イントロ表示
     if (this.phase === 'intro') {
       ctx.textAlign = 'center'
-      ctx.font = this.font(64)
       ctx.strokeStyle = '#000'
       ctx.lineWidth = 8
-      const txt = this.phaseT < 70 ? `ROUND ${this.roundNo}` : 'FIGHT!'
-      ctx.strokeText(txt, VIEW_W / 2, 260)
-      ctx.fillStyle = this.phaseT < 70 ? '#ffd60a' : '#ff453a'
-      ctx.fillText(txt, VIEW_W / 2, 260)
+      if (this.phaseT < 70) {
+        if (this.isArcade) {
+          const boss = f2.def.isBoss
+          ctx.font = this.font(boss ? 46 : 56)
+          const txt = boss ? `LAST BOSS 「${f2.def.name}」現る…!` : `${f2.def.name} 参上!`
+          ctx.strokeText(txt, VIEW_W / 2, 260)
+          ctx.fillStyle = boss ? '#c9a227' : '#ffd60a'
+          ctx.fillText(txt, VIEW_W / 2, 260)
+        } else {
+          ctx.font = this.font(64)
+          const txt = `ROUND ${this.roundNo}`
+          ctx.strokeText(txt, VIEW_W / 2, 260)
+          ctx.fillStyle = '#ffd60a'
+          ctx.fillText(txt, VIEW_W / 2, 260)
+        }
+      } else {
+        ctx.font = this.font(64)
+        ctx.strokeText('FIGHT!', VIEW_W / 2, 260)
+        ctx.fillStyle = '#ff453a'
+        ctx.fillText('FIGHT!', VIEW_W / 2, 260)
+      }
       ctx.textAlign = 'left'
     }
   }
@@ -1475,7 +1515,7 @@ export class Game {
       ctx.fillStyle = '#ffffff'
       ctx.fillText(f.def.name, rightAlign ? x + barW : x, 60)
       // ラウンド取得
-      for (let i = 0; i < ROUNDS_TO_WIN; i++) {
+      for (let i = 0; i < this.roundsToWin; i++) {
         const cx = rightAlign ? x + barW - 90 - i * 22 : x + 90 + i * 22
         ctx.beginPath()
         ctx.arc(cx, 54, 8, 0, Math.PI * 2)
@@ -1519,19 +1559,37 @@ export class Game {
     if (!this.fighters) return
     const winner = this.matchWinner >= 0 ? this.fighters[this.matchWinner] : null
 
+    const cleared = this.isArcade && this.matchWinner === 0 && this.arcadeIndex === ARCADE_QUEUE.length - 1
+
     ctx.textAlign = 'center'
     if (winner) {
-      drawCharacter(ctx, winner.def, VIEW_W / 2, 320, 200, 1, 'special', this.frame)
-      ctx.font = this.font(56)
-      ctx.strokeStyle = '#000'
-      ctx.lineWidth = 8
-      const label = `${winner.def.name} の勝ち!`
-      ctx.strokeText(label, VIEW_W / 2, 110)
-      ctx.fillStyle = '#ffd60a'
-      ctx.fillText(label, VIEW_W / 2, 110)
+      const drawFn = winner.def.species === 'cat' ? drawCat : drawCharacter
+      drawFn(ctx, winner.def, VIEW_W / 2, 320, winner.def.species === 'cat' ? 150 : 200, 1, 'special', this.frame)
+      if (cleared) {
+        ctx.font = this.font(46)
+        ctx.strokeStyle = '#000'
+        ctx.lineWidth = 8
+        ctx.strokeText('GAME CLEAR!!', VIEW_W / 2, 100)
+        ctx.fillStyle = '#c9a227'
+        ctx.fillText('GAME CLEAR!!', VIEW_W / 2, 100)
+        ctx.font = this.font(24)
+        ctx.strokeText('道代を打ち倒した!', VIEW_W / 2, 140)
+        ctx.fillStyle = '#ffd60a'
+        ctx.fillText('道代を打ち倒した!', VIEW_W / 2, 140)
+      } else {
+        ctx.font = this.font(56)
+        ctx.strokeStyle = '#000'
+        ctx.lineWidth = 8
+        const label = `${winner.def.name} の勝ち!`
+        ctx.strokeText(label, VIEW_W / 2, 110)
+        ctx.fillStyle = '#ffd60a'
+        ctx.fillText(label, VIEW_W / 2, 110)
+      }
     }
 
-    const items = ['もういちど対戦', 'キャラをえらびなおす', 'タイトルへ']
+    const items = this.isArcade
+      ? ['もういちど対戦', 'アーケードを最初から', 'タイトルへ']
+      : ['もういちど対戦', 'キャラをえらびなおす', 'タイトルへ']
     items.forEach((label, i) => {
       const y = 390 + i * 52
       const rect: Rect = { x: VIEW_W / 2 - 190, y: y - 30, w: 380, h: 42 }
@@ -1575,7 +1633,31 @@ export class Game {
       : false
     if (guarding) pose = 'guard'
 
-    drawCharacter(ctx, f.def, f.x, f.y, f.hPx, f.facing, pose, f.animT)
+    // 隠れ筋肉小ネタ: 必殺技の発動中だけ一瞬マッチョな姿がよぎる
+    const buffFlash = !!(
+      f.def.secretBuff &&
+      f.state === 'attack' &&
+      f.move?.meterCost &&
+      f.moveT > f.move.startup &&
+      f.moveT <= f.move.startup + f.move.active
+    )
+    if (buffFlash) {
+      ctx.save()
+      ctx.globalAlpha = 0.4 + 0.3 * Math.sin(f.animT / 2)
+      ctx.fillStyle = '#ffd60a'
+      ctx.beginPath()
+      ctx.arc(f.x, f.y - f.hPx / 2, f.hPx * 0.7, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
+    const drawDef: CharDef = buffFlash ? { ...f.def, shirt: f.def.skin, widthScale: f.def.widthScale * 1.2 } : f.def
+    const drawFn = f.def.species === 'cat' ? drawCat : drawCharacter
+    drawFn(ctx, drawDef, f.x, f.y, f.hPx, f.facing, pose, f.animT)
+    if (buffFlash) {
+      ctx.font = '22px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('💪', f.x + f.facing * f.wPx * 0.7, f.y - f.hPx - 8)
+    }
 
     // 状態異常アイコン
     const active = (Object.keys(f.statuses) as StatusKind[]).filter((k) => f.has(k))
@@ -1895,6 +1977,167 @@ export function drawCharacter(
     ctx.fillText('×', lean + headR * 0.45, headY + u * 0.4)
   } else {
     ctx.fillRect(lean + headR * 0.35, headY - u * 0.25, u * 0.45, u * 0.5)
+  }
+
+  ctx.restore()
+}
+
+// ---------- 猫キャラクター描画(敵キャラ用) ----------
+
+export function drawCat(
+  ctx: CanvasRenderingContext2D,
+  d: CharDef,
+  x: number,
+  yFeet: number,
+  h: number,
+  facing: 1 | -1,
+  pose: Pose,
+  animT: number
+) {
+  const u = h / 10
+  const ws = d.widthScale
+  const legScale = d.catLegScale ?? 1
+  const fur = d.furColor ?? d.skin
+  const accent = d.furAccent ?? '#ffffff'
+  const eye = d.eyeColor ?? '#1c1917'
+
+  ctx.save()
+  ctx.translate(x, yFeet)
+
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'
+  ctx.beginPath()
+  ctx.ellipse(0, 2, u * 3.6 * ws, u * 0.8, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.scale(facing, 1)
+
+  if (pose === 'ko') {
+    ctx.rotate(-Math.PI / 2)
+    ctx.translate(u * 1.2, 0)
+  }
+
+  const bob = pose === 'idle' ? Math.sin(animT / 14) * u * 0.15 : 0
+  const walkSwing = pose === 'walk' ? Math.sin(animT / 5) : 0
+  const legH = 3.0 * u * legScale
+  const bodyW = 6.2 * u * ws
+  const bodyH = 3.0 * u
+  const hipY = -legH + bob
+  const bodyCy = hipY - bodyH / 2
+  const legW = 1.1 * u
+
+  // 後ろ足
+  ctx.fillStyle = fur
+  const legSwing = pose === 'walk' ? walkSwing * u * 0.6 : 0
+  ctx.fillRect(-bodyW * 0.32 + legSwing, hipY - legH * 0.05, legW, legH)
+
+  // 前足
+  const crouch = pose === 'guard' || pose === 'hit'
+  const frontLegH = crouch ? legH * 0.7 : legH
+  if (pose === 'punch' || pose === 'kick') {
+    ctx.fillRect(bodyW * 0.18, hipY - legH * 0.05, legW, legH * 0.6)
+    ctx.save()
+    ctx.translate(bodyW * 0.36, hipY - legH * 0.3)
+    ctx.rotate(-0.6)
+    ctx.fillRect(0, -legW / 2, u * 2.4, legW)
+    ctx.restore()
+  } else if (pose === 'special') {
+    ctx.save()
+    ctx.translate(bodyW * 0.3, hipY - frontLegH * 0.2)
+    ctx.rotate(-1.3)
+    ctx.fillRect(0, -legW / 2, u * 2.2, legW)
+    ctx.restore()
+  } else {
+    ctx.fillRect(bodyW * 0.24 - legSwing, hipY - frontLegH * 0.05, legW, frontLegH)
+  }
+
+  // しっぽ
+  ctx.strokeStyle = fur
+  ctx.lineWidth = u * 0.9
+  ctx.lineCap = 'round'
+  const tailSway = Math.sin(animT / 8) * u * 0.8
+  ctx.beginPath()
+  ctx.moveTo(-bodyW * 0.42, bodyCy + bodyH * 0.1)
+  ctx.quadraticCurveTo(-bodyW * 0.75, bodyCy - bodyH * 0.6 + tailSway, -bodyW * 0.6, bodyCy - bodyH * 1.3 + tailSway)
+  ctx.stroke()
+
+  // 胴体
+  ctx.fillStyle = fur
+  ctx.beginPath()
+  ctx.ellipse(0, bodyCy, bodyW / 2, bodyH / 2, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // お腹の差し色
+  ctx.fillStyle = accent
+  ctx.beginPath()
+  ctx.ellipse(bodyW * 0.05, bodyCy + bodyH * 0.25, bodyW * 0.3, bodyH * 0.32, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 頭
+  const headR = 2.0 * u
+  const leanForward = pose === 'punch' || pose === 'kick' ? u * 0.6 : 0
+  const headCx = bodyW / 2 + headR * 0.35 + leanForward
+  const headCy = bodyCy - bodyH * 0.25 - (pose === 'special' ? u * 0.8 : 0)
+
+  // 耳
+  ctx.fillStyle = fur
+  ctx.beginPath()
+  ctx.moveTo(headCx - headR * 0.7, headCy - headR * 0.6)
+  ctx.lineTo(headCx - headR * 0.2, headCy - headR * 1.5)
+  ctx.lineTo(headCx + headR * 0.05, headCy - headR * 0.55)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(headCx + headR * 0.15, headCy - headR * 0.65)
+  ctx.lineTo(headCx + headR * 0.7, headCy - headR * 1.4)
+  ctx.lineTo(headCx + headR * 0.85, headCy - headR * 0.5)
+  ctx.fill()
+
+  // 頭部
+  ctx.beginPath()
+  ctx.arc(headCx, headCy, headR, 0, Math.PI * 2)
+  ctx.fill()
+
+  // マズル
+  ctx.fillStyle = accent
+  ctx.beginPath()
+  ctx.ellipse(headCx + headR * 0.35, headCy + headR * 0.25, headR * 0.55, headR * 0.4, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 目
+  if (pose === 'ko') {
+    ctx.font = `${u * 1.3}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#1c1917'
+    ctx.fillText('××', headCx, headCy)
+  } else {
+    ctx.fillStyle = eye
+    const eyeSquint = pose === 'hit' || pose === 'guard'
+    const eyeH = eyeSquint ? headR * 0.12 : headR * 0.28
+    ctx.beginPath()
+    ctx.ellipse(headCx + headR * 0.45, headCy - headR * 0.05, headR * 0.16, eyeH, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.ellipse(headCx + headR * 0.05, headCy - headR * 0.1, headR * 0.16, eyeH, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // ひげ
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)'
+  ctx.lineWidth = 1
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath()
+    ctx.moveTo(headCx + headR * 0.5, headCy + headR * 0.3 + i * headR * 0.15)
+    ctx.lineTo(headCx + headR * 1.5, headCy + headR * 0.2 + i * headR * 0.25)
+    ctx.stroke()
+  }
+
+  // 口(攻撃時に開く)
+  if (pose === 'punch' || pose === 'kick' || pose === 'special') {
+    ctx.fillStyle = '#7a2d2d'
+    ctx.beginPath()
+    ctx.moveTo(headCx + headR * 0.5, headCy + headR * 0.4)
+    ctx.lineTo(headCx + headR * 0.75, headCy + headR * 0.55)
+    ctx.lineTo(headCx + headR * 0.5, headCy + headR * 0.7)
+    ctx.fill()
   }
 
   ctx.restore()
