@@ -73,13 +73,26 @@ function anchorOf(img: HTMLImageElement): Anchor {
   return { centerXFrac: (bbox.x0 + bbox.x1) / 2 / w, feetYFrac: bbox.y1 / h }
 }
 
+// スタンドアロン(Artifact)ビルド用: window.__SPRITE_ASSETS__ にdata URIを積んでおけば
+// public/ 配信が無い環境でも同じロジックでスプライトを読み込める。
+declare global {
+  interface Window {
+    __SPRITE_ASSETS__?: Partial<Record<string, Partial<Record<SpritePose, string>>>>
+  }
+}
+
+function resolveSrc(charId: string, pose: SpritePose): string {
+  const inline = typeof window !== 'undefined' ? window.__SPRITE_ASSETS__?.[charId]?.[pose] : undefined
+  return inline ?? `/game-sprites/${charId}/${pose}.png`
+}
+
 async function buildSpriteSet(charId: string): Promise<SpriteSet | 'none'> {
-  const idleImg = await loadImage(`/game-sprites/${charId}/idle.png`)
+  const idleImg = await loadImage(resolveSrc(charId, 'idle'))
   if (!idleImg) return 'none'
   const images: SpriteSet['images'] = { idle: idleImg }
   await Promise.all(
     SPRITE_POSES.filter((p) => p !== 'idle').map(async (pose) => {
-      const img = await loadImage(`/game-sprites/${charId}/${pose}.png`)
+      const img = await loadImage(resolveSrc(charId, pose))
       if (img) images[pose] = img
     })
   )
