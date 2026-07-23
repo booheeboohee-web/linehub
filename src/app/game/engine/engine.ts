@@ -1399,10 +1399,54 @@ export class Game {
       this.tapRects.push({
         rect,
         act: () => {
-          this.selCursor[this.picker] = i
-          this.confirmSelect(i)
+          // タップは見るだけ(プレビュー)。決定は下の「けってい」ボタンで行う。
+          if (this.selCursor[this.picker] !== i) {
+            this.selCursor[this.picker] = i
+            this.audio.sfx('select')
+          }
         },
       })
+    })
+
+    // 決定/戻るボタン(グリッド下の余白)
+    const btnY = gy + 3 * (cell + 10) - 10 + 14
+    const btnH = 46
+    if (this.picker === 1) {
+      const backRect: Rect = { x: gx, y: btnY, w: 160, h: btnH }
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'
+      ctx.fillRect(backRect.x, backRect.y, backRect.w, backRect.h)
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 2
+      ctx.strokeRect(backRect.x, backRect.y, backRect.w, backRect.h)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = this.font(18)
+      ctx.textAlign = 'center'
+      ctx.fillText('もどる', backRect.x + backRect.w / 2, backRect.y + btnH / 2 + 6)
+      ctx.textAlign = 'left'
+      this.tapRects.push({
+        rect: backRect,
+        act: () => {
+          this.picker = 0
+          this.picked[0] = -1
+          this.audio.sfx('error')
+        },
+      })
+    }
+    const confirmRect: Rect =
+      this.picker === 1 ? { x: gx + 170, y: btnY, w: gx + 3 * (cell + 10) - 10 - (gx + 170), h: btnH } : { x: gx, y: btnY, w: 3 * (cell + 10) - 10, h: btnH }
+    ctx.fillStyle = '#dc2626'
+    ctx.fillRect(confirmRect.x, confirmRect.y, confirmRect.w, confirmRect.h)
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 3
+    ctx.strokeRect(confirmRect.x, confirmRect.y, confirmRect.w, confirmRect.h)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = this.font(22)
+    ctx.textAlign = 'center'
+    ctx.fillText('けってい', confirmRect.x + confirmRect.w / 2, confirmRect.y + btnH / 2 + 7)
+    ctx.textAlign = 'left'
+    this.tapRects.push({
+      rect: confirmRect,
+      act: () => this.confirmSelect(this.selCursor[this.picker]),
     })
 
     // 選択中キャラの詳細
@@ -1449,7 +1493,7 @@ export class Game {
     ctx.textAlign = 'center'
     ctx.fillStyle = '#cbd5e1'
     ctx.font = this.font(16, false)
-    ctx.fillText('タップ or 移動キー+パンチで決定 / (2P選択中にキックで戻る)', VIEW_W / 2, VIEW_H - 18)
+    ctx.fillText('タップでキャラを見て「けってい」で確定 / キーボードは移動キー+パンチでも決定', VIEW_W / 2, VIEW_H - 18)
     ctx.textAlign = 'left'
   }
 
