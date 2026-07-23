@@ -3,6 +3,7 @@
 
 import { CHARACTERS, CharDef, MoveDef, StatusKind, STATUS_INFO, ProjectileKind, ARCADE_QUEUE } from './characters'
 import { getSprites, pickSprite, SpritePose } from './sprites'
+import { getStageImage, STAGE_COUNT } from './stages'
 
 const POSE_TO_SPRITE: Record<Pose, SpritePose> = {
   idle: 'idle',
@@ -251,6 +252,7 @@ export class Game {
   private tapRects: { rect: Rect; act: () => void }[] = []
   private isArcade = false
   private arcadeIndex = 0
+  private stageIndex = 0
 
   // バトル系
   private fighters: [Fighter, Fighter] | null = null
@@ -384,6 +386,7 @@ export class Game {
     this.roundNo = 1
     this.matchWinner = -1
     this.roundsToWin = this.isArcade ? 1 : ROUNDS_TO_WIN
+    this.stageIndex = Math.floor(Math.random() * STAGE_COUNT)
     this.startRound()
     this.screen = 'battle'
     this.audio.sfx('super')
@@ -1270,6 +1273,28 @@ export class Game {
     ctx.fillRect(0, GROUND, VIEW_W, 6)
   }
 
+  /** バトル画面専用: 実写ステージ写真を背景に使う。未ロードならイラスト背景にフォールバック。 */
+  private renderStageBg(ctx: CanvasRenderingContext2D) {
+    const img = getStageImage(this.stageIndex)
+    if (!img) {
+      this.renderBg(ctx)
+      return
+    }
+    ctx.drawImage(img, 0, 0, VIEW_W, VIEW_H)
+    // 夕景トーンに寄せる雰囲気合わせのオーバーレイ
+    const tint = ctx.createLinearGradient(0, 0, 0, VIEW_H)
+    tint.addColorStop(0, 'rgba(43,30,78,0.45)')
+    tint.addColorStop(0.55, 'rgba(122,59,110,0.28)')
+    tint.addColorStop(1, 'rgba(20,14,20,0.55)')
+    ctx.fillStyle = tint
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+    // 足元のコントラスト用に地面帯を軽く暗く
+    ctx.fillStyle = 'rgba(10,8,10,0.35)'
+    ctx.fillRect(0, GROUND, VIEW_W, VIEW_H - GROUND)
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'
+    ctx.fillRect(0, GROUND, VIEW_W, 3)
+  }
+
   private renderTitle(ctx: CanvasRenderingContext2D) {
     this.renderBg(ctx)
     ctx.textAlign = 'center'
@@ -1437,7 +1462,7 @@ export class Game {
       ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake)
     }
 
-    this.renderBg(ctx)
+    this.renderStageBg(ctx)
 
     // バリア(洗濯物)
     for (const b of this.barriers) this.drawBarrier(ctx, b)
