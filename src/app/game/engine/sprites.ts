@@ -83,7 +83,7 @@ declare global {
 
 function resolveSrc(charId: string, pose: SpritePose): string {
   const inline = typeof window !== 'undefined' ? window.__SPRITE_ASSETS__?.[charId]?.[pose] : undefined
-  return inline ?? `/game-sprites/${charId}/${pose}.png`
+  return inline ?? `/game-sprites/${charId}/${pose}.webp`
 }
 
 async function buildSpriteSet(charId: string): Promise<SpriteSet | 'none'> {

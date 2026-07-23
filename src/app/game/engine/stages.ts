@@ -23,7 +23,7 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
 
 function resolveSrc(index: number): string {
   const inline = typeof window !== 'undefined' ? window.__STAGE_ASSETS__?.[index] : undefined
-  return inline ?? `/game-bg/house${index + 1}.jpg`
+  return inline ?? `/game-bg/house${index + 1}.webp`
 }
 
 /** 未読み込みならロードを開始してnullを返す(呼び出し側は毎フレーム呼んでよい)。 */
