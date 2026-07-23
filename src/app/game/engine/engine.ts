@@ -2,6 +2,19 @@
 // 外部ライブラリ不使用。Canvas 2D + 固定タイムステップ(60fps)
 
 import { CHARACTERS, CharDef, MoveDef, StatusKind, STATUS_INFO, ProjectileKind, ARCADE_QUEUE } from './characters'
+import { getSprites, pickSprite, SpritePose } from './sprites'
+
+const POSE_TO_SPRITE: Record<Pose, SpritePose> = {
+  idle: 'idle',
+  walk: 'idle',
+  jump: 'idle',
+  guard: 'idle',
+  punch: 'punch',
+  kick: 'kick',
+  special: 'special',
+  hit: 'hit',
+  ko: 'ko',
+}
 import { AudioMan } from './audio'
 
 export const VIEW_W = 960
@@ -1249,7 +1262,7 @@ export class Game {
     // キャラ整列
     CHARACTERS.forEach((d, i) => {
       const x = 90 + i * ((VIEW_W - 180) / 8)
-      drawCharacter(ctx, d, x, GROUND, d.heightCm * 0.5, i < 5 ? 1 : -1, 'idle', this.frame + i * 13)
+      this.drawPortrait(ctx, d, x, GROUND, d.heightCm * 0.5, i < 5 ? 1 : -1, 'idle', this.frame + i * 13)
     })
 
     ctx.fillStyle = '#ffd60a'
@@ -1337,7 +1350,7 @@ export class Game {
         ctx.lineWidth = 5
         ctx.strokeRect(cx + 2, cy + 2, cell - 4, cell - 4)
       }
-      drawCharacter(ctx, d, cx + cell / 2, cy + cell - 14, 74, 1, curIdx === i ? 'special' : 'idle', this.frame)
+      this.drawPortrait(ctx, d, cx + cell / 2, cy + cell - 14, 74, 1, curIdx === i ? 'special' : 'idle', this.frame)
       ctx.fillStyle = '#ffffff'
       ctx.font = this.font(15)
       ctx.fillText(d.name, cx + cell / 2, cy + cell - 4)
@@ -1356,7 +1369,7 @@ export class Game {
     ctx.textAlign = 'left'
     ctx.fillStyle = 'rgba(255,255,255,0.08)'
     ctx.fillRect(px - 20, 90, 360, 344)
-    drawCharacter(ctx, d, px + 40, 300, d.heightCm * 1.05, 1, 'special', this.frame)
+    this.drawPortrait(ctx, d, px + 40, 300, d.heightCm * 1.05, 1, 'special', this.frame)
     ctx.fillStyle = d.accent
     ctx.font = this.font(30)
     ctx.fillText(`${d.name}`, px + 110, 130)
@@ -1563,8 +1576,7 @@ export class Game {
 
     ctx.textAlign = 'center'
     if (winner) {
-      const drawFn = winner.def.species === 'cat' ? drawCat : drawCharacter
-      drawFn(ctx, winner.def, VIEW_W / 2, 320, winner.def.species === 'cat' ? 150 : 200, 1, 'special', this.frame)
+      this.drawPortrait(ctx, winner.def, VIEW_W / 2, 320, winner.def.species === 'cat' ? 150 : 200, 1, 'special', this.frame)
       if (cleared) {
         ctx.font = this.font(46)
         ctx.strokeStyle = '#000'
@@ -1650,9 +1662,13 @@ export class Game {
       ctx.fill()
       ctx.restore()
     }
-    const drawDef: CharDef = buffFlash ? { ...f.def, shirt: f.def.skin, widthScale: f.def.widthScale * 1.2 } : f.def
-    const drawFn = f.def.species === 'cat' ? drawCat : drawCharacter
-    drawFn(ctx, drawDef, f.x, f.y, f.hPx, f.facing, pose, f.animT)
+    const sprites = getSprites(f.def.id)
+    const drawn = sprites && this.drawSpriteFighter(ctx, sprites, POSE_TO_SPRITE[pose], f)
+    if (!drawn) {
+      const drawDef: CharDef = buffFlash ? { ...f.def, shirt: f.def.skin, widthScale: f.def.widthScale * 1.2 } : f.def
+      const drawFn = f.def.species === 'cat' ? drawCat : drawCharacter
+      drawFn(ctx, drawDef, f.x, f.y, f.hPx, f.facing, pose, f.animT)
+    }
     if (buffFlash) {
       ctx.font = '22px sans-serif'
       ctx.textAlign = 'center'
@@ -1671,6 +1687,68 @@ export class Game {
       ctx.font = '16px sans-serif'
       ctx.fillText('💕', f.x + Math.sin(f.animT / 10) * 20, f.y - f.hPx - 30)
     }
+  }
+
+  /** ファイター以外(タイトル整列・キャラ選択・リザルト)向けの汎用描画。スプライトがあればそれを、無ければプログラム描画を使う。 */
+  private drawPortrait(
+    ctx: CanvasRenderingContext2D,
+    d: CharDef,
+    x: number,
+    yFeet: number,
+    h: number,
+    facing: 1 | -1,
+    pose: Pose,
+    animT: number
+  ) {
+    const sprites = getSprites(d.id)
+    if (sprites) {
+      const picked = pickSprite(sprites, POSE_TO_SPRITE[pose])
+      if (picked) {
+        const { img, anchor } = picked
+        const scale = h / sprites.bodyPxHeight
+        const drawW = img.naturalWidth * scale
+        const drawH = img.naturalHeight * scale
+        ctx.save()
+        ctx.translate(x, yFeet)
+        ctx.scale(facing, 1)
+        ctx.drawImage(img, -anchor.centerXFrac * drawW, -anchor.feetYFrac * drawH, drawW, drawH)
+        ctx.restore()
+        return
+      }
+    }
+    const drawFn = d.species === 'cat' ? drawCat : drawCharacter
+    drawFn(ctx, d, x, yFeet, h, facing, pose, animT)
+  }
+
+  /** AI生成スプライトで描画できたらtrue。まだ画像が揃っていなければfalse(呼び出し側がプログラム描画にフォールバック)。 */
+  private drawSpriteFighter(
+    ctx: CanvasRenderingContext2D,
+    sprites: ReturnType<typeof getSprites>,
+    pose: SpritePose,
+    f: Fighter
+  ): boolean {
+    if (!sprites) return false
+    const picked = pickSprite(sprites, pose)
+    if (!picked) return false
+    const { img, anchor } = picked
+    const scale = f.hPx / sprites.bodyPxHeight
+    const iw = img.naturalWidth
+    const ih = img.naturalHeight
+    const drawW = iw * scale
+    const drawH = ih * scale
+    const anchorX = anchor.centerXFrac * drawW
+    const anchorY = anchor.feetYFrac * drawH
+
+    ctx.save()
+    ctx.translate(f.x, f.y)
+    ctx.scale(f.facing, 1)
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'
+    ctx.beginPath()
+    ctx.ellipse(0, 2, f.wPx * 1.3, f.hPx * 0.07, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.drawImage(img, -anchorX, -anchorY, drawW, drawH)
+    ctx.restore()
+    return true
   }
 
   private drawBarrier(ctx: CanvasRenderingContext2D, b: Barrier) {
