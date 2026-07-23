@@ -1214,6 +1214,23 @@ export class Game {
     return `${bold ? 'bold ' : ''}${size}px "Noto Sans JP", "Hiragino Sans", sans-serif`
   }
 
+  /** 日本語文字単位で折り返す(ctx.fontは呼び出し側で設定済みのものを使う)。 */
+  private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+    const lines: string[] = []
+    let cur = ''
+    for (const ch of text) {
+      const test = cur + ch
+      if (cur && ctx.measureText(test).width > maxWidth) {
+        lines.push(cur)
+        cur = ch
+      } else {
+        cur = test
+      }
+    }
+    if (cur) lines.push(cur)
+    return lines
+  }
+
   private renderBg(ctx: CanvasRenderingContext2D) {
     // 夕方の住宅街ステージ
     const sky = ctx.createLinearGradient(0, 0, 0, GROUND)
@@ -1366,25 +1383,43 @@ export class Game {
     // 選択中キャラの詳細
     const d = CHARACTERS[this.selCursor[this.picker]]
     const px = VIEW_W / 2 + 120
+    const textX = px + 110
+    const textMaxW = px + 340 - textX - 8
     ctx.textAlign = 'left'
     ctx.fillStyle = 'rgba(255,255,255,0.08)'
-    ctx.fillRect(px - 20, 90, 360, 344)
+    ctx.fillRect(px - 20, 90, 360, 420)
     this.drawPortrait(ctx, d, px + 40, 300, d.heightCm * 1.05, 1, 'special', this.frame)
     ctx.fillStyle = d.accent
     ctx.font = this.font(30)
-    ctx.fillText(`${d.name}`, px + 110, 130)
+    ctx.fillText(`${d.name}`, textX, 130)
     ctx.fillStyle = '#e2e8f0'
     ctx.font = this.font(15, false)
-    ctx.fillText(`${d.age}歳・${d.sex} / ${d.heightCm}cm ${d.weightKg}kg`, px + 110, 158)
-    ctx.fillText(d.typeDesc, px + 110, 180)
-    ctx.fillStyle = '#fbbf24'
-    ctx.font = this.font(15)
-    ctx.fillText(`特殊: ${d.unique.name}`, px + 110, 215)
-    ctx.fillText(`必殺: ${d.sp1.name}`, px + 110, 240)
-    ctx.fillText(`超必殺: ${d.sp2.name}`, px + 110, 265)
+    ctx.fillText(`${d.age}歳・${d.sex} / ${d.heightCm}cm ${d.weightKg}kg`, textX, 158)
+    ctx.fillText(d.typeDesc, textX, 180)
+
+    let my = 213
+    const drawMove = (label: string, move: MoveDef) => {
+      ctx.fillStyle = '#fbbf24'
+      ctx.font = this.font(15)
+      ctx.fillText(`${label}: ${move.name}`, textX, my)
+      my += 17
+      if (move.desc) {
+        ctx.fillStyle = '#b9c2cf'
+        ctx.font = this.font(12, false)
+        for (const line of this.wrapText(ctx, move.desc, textMaxW)) {
+          ctx.fillText(line, textX, my)
+          my += 15
+        }
+      }
+      my += 8
+    }
+    drawMove('特殊', d.unique)
+    drawMove('必殺', d.sp1)
+    drawMove('超必殺', d.sp2)
+
     ctx.fillStyle = '#cbd5e1'
     ctx.font = this.font(13, false)
-    ctx.fillText(`HP ${d.hp} / スピード ${d.speed}`, px + 110, 295)
+    ctx.fillText(`HP ${d.hp} / スピード ${d.speed}`, textX, my + 6)
 
     ctx.textAlign = 'center'
     ctx.fillStyle = '#cbd5e1'
