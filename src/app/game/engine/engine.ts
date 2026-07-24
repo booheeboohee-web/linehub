@@ -3,7 +3,7 @@
 
 import { CHARACTERS, CharDef, MoveDef, StatusKind, STATUS_INFO, ProjectileKind, ARCADE_QUEUE } from './characters'
 import { getSprites, pickSprite, SpritePose } from './sprites'
-import { getStageImage, STAGE_COUNT } from './stages'
+import { getStageImage, getTitleImage, STAGE_COUNT } from './stages'
 
 const POSE_TO_SPRITE: Record<Pose, SpritePose> = {
   idle: 'idle',
@@ -1297,33 +1297,30 @@ export class Game {
   }
 
   private renderTitle(ctx: CanvasRenderingContext2D) {
-    this.renderBg(ctx)
+    const img = getTitleImage()
+    if (img) {
+      ctx.drawImage(img, 0, 0, VIEW_W, VIEW_H)
+    } else {
+      this.renderBg(ctx)
+    }
     ctx.textAlign = 'center'
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
 
-    // キャラ整列
-    CHARACTERS.forEach((d, i) => {
-      const x = 90 + i * ((VIEW_W - 180) / 8)
-      this.drawPortrait(ctx, d, x, GROUND, d.heightCm * 0.5, i < 5 ? 1 : -1, 'idle', this.frame + i * 13)
-    })
-
-    ctx.fillStyle = '#ffd60a'
-    ctx.strokeStyle = '#7c2d12'
-    ctx.lineWidth = 8
-    ctx.font = this.font(72)
-    ctx.strokeText('ファミリーファイターズ', VIEW_W / 2, 170)
-    ctx.fillText('ファミリーファイターズ', VIEW_W / 2, 170)
-    ctx.font = this.font(24)
-    ctx.fillStyle = '#fecaca'
-    ctx.fillText('〜 家族格闘伝説 〜', VIEW_W / 2, 215)
+    // 下部の文字を読みやすくするグラデーション
+    const grad = ctx.createLinearGradient(0, VIEW_H - 96, 0, VIEW_H)
+    grad.addColorStop(0, 'rgba(0,0,0,0)')
+    grad.addColorStop(1, 'rgba(0,0,0,0.8)')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, VIEW_H - 96, VIEW_W, 96)
 
     if (Math.floor(this.frame / 30) % 2 === 0) {
       ctx.font = this.font(26)
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 5
+      ctx.strokeText('タップ / 何かキーを押してスタート', VIEW_W / 2, VIEW_H - 46)
       ctx.fillStyle = '#ffffff'
-      ctx.fillText('タップ / 何かキーを押してスタート', VIEW_W / 2, 300)
+      ctx.fillText('タップ / 何かキーを押してスタート', VIEW_W / 2, VIEW_H - 46)
     }
-    ctx.font = this.font(15, false)
+    ctx.font = this.font(14, false)
     ctx.fillStyle = '#cbd5e1'
     ctx.fillText('PC: 1P=WASD+F/G/H/Space  2P=矢印+J/K/L/Enter  (M:ミュート)', VIEW_W / 2, VIEW_H - 16)
     ctx.textAlign = 'left'

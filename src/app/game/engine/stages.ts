@@ -7,10 +7,12 @@ export const STAGE_COUNT = 3
 declare global {
   interface Window {
     __STAGE_ASSETS__?: string[]
+    __TITLE_ASSET__?: string
   }
 }
 
 const cache = new Map<number, HTMLImageElement | 'none' | 'loading'>()
+let titleCache: HTMLImageElement | 'none' | 'loading' | undefined
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -37,4 +39,19 @@ export function getStageImage(index: number): HTMLImageElement | null {
     return null
   }
   return cached
+}
+
+/** タイトル画面のキービジュアル。未読み込みならロードを開始してnullを返す。 */
+export function getTitleImage(): HTMLImageElement | null {
+  if (titleCache === 'none' || titleCache === 'loading' || titleCache === undefined) {
+    if (titleCache === undefined) {
+      titleCache = 'loading'
+      const src = (typeof window !== 'undefined' ? window.__TITLE_ASSET__ : undefined) ?? '/game-bg/title.webp'
+      void loadImage(src).then((img) => {
+        titleCache = img ?? 'none'
+      })
+    }
+    return null
+  }
+  return titleCache
 }
