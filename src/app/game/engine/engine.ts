@@ -173,7 +173,8 @@ class Fighter {
   }
 
   get hPx() {
-    return this.def.heightCm * 0.78
+    // キャラの顔が見える大きさにするため、実寸(0.78)よりだいぶ大きめに表示する
+    return this.def.heightCm * 1.05
   }
 
   get wPx() {
