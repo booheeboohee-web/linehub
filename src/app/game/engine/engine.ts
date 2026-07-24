@@ -4,6 +4,15 @@
 import { CHARACTERS, CharDef, MoveDef, StatusKind, STATUS_INFO, ProjectileKind, ARCADE_QUEUE } from './characters'
 import { getSprites, pickSprite, SpritePose } from './sprites'
 import { getStageImage, getTitleImage, STAGE_COUNT } from './stages'
+import { getFxImage } from './fx'
+
+/** 画像の縦横比を保ったまま中心基準で描画する。 */
+function drawFxImage(ctx: CanvasRenderingContext2D, img: HTMLImageElement, targetW: number) {
+  const scale = targetW / img.naturalWidth
+  const w = img.naturalWidth * scale
+  const h = img.naturalHeight * scale
+  ctx.drawImage(img, -w / 2, -h / 2, w, h)
+}
 
 const POSE_TO_SPRITE: Record<Pose, SpritePose> = {
   idle: 'idle',
@@ -1884,12 +1893,17 @@ export class Game {
     const dir = p.vx >= 0 ? 1 : -1
     switch (p.kind) {
       case 'table': {
+        const img = getFxImage('table')
         ctx.rotate((this.frame / 5) * dir)
-        ctx.fillStyle = '#8b5a2b'
-        ctx.fillRect(-p.w / 2, -8, p.w, 16)
-        ctx.fillStyle = '#6b4423'
-        ctx.fillRect(-p.w / 2 + 6, 8, 8, 14)
-        ctx.fillRect(p.w / 2 - 14, 8, 8, 14)
+        if (img) {
+          drawFxImage(ctx, img, p.w)
+        } else {
+          ctx.fillStyle = '#8b5a2b'
+          ctx.fillRect(-p.w / 2, -8, p.w, 16)
+          ctx.fillStyle = '#6b4423'
+          ctx.fillRect(-p.w / 2 + 6, 8, 8, 14)
+          ctx.fillRect(p.w / 2 - 14, 8, 8, 14)
+        }
         break
       }
       case 'paper': {
@@ -1908,13 +1922,19 @@ export class Game {
         break
       }
       case 'coin': {
-        ctx.fillStyle = '#fbbf24'
-        ctx.beginPath()
-        ctx.arc(0, 0, 7, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.strokeStyle = '#92400e'
-        ctx.lineWidth = 2
-        ctx.stroke()
+        const img = getFxImage('coin')
+        if (img) {
+          ctx.scale(dir, 1)
+          drawFxImage(ctx, img, p.w)
+        } else {
+          ctx.fillStyle = '#fbbf24'
+          ctx.beginPath()
+          ctx.arc(0, 0, 7, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.strokeStyle = '#92400e'
+          ctx.lineWidth = 2
+          ctx.stroke()
+        }
         break
       }
       case 'booger': {
@@ -1957,21 +1977,26 @@ export class Game {
         break
       }
       case 'car': {
+        const img = getFxImage('car')
         ctx.scale(dir, 1)
-        ctx.fillStyle = '#dc2626'
-        ctx.fillRect(-p.w / 2, -p.h / 2 + 14, p.w, p.h - 26)
-        ctx.fillStyle = '#7f1d1d'
-        ctx.fillRect(-p.w / 2 + 20, -p.h / 2, p.w - 56, 22)
-        ctx.fillStyle = '#bfdbfe'
-        ctx.fillRect(-p.w / 2 + 26, -p.h / 2 + 3, 30, 16)
-        ctx.fillRect(-p.w / 2 + 62, -p.h / 2 + 3, 30, 16)
-        ctx.fillStyle = '#1c1917'
-        ctx.beginPath()
-        ctx.arc(-p.w / 2 + 30, p.h / 2 - 8, 13, 0, Math.PI * 2)
-        ctx.arc(p.w / 2 - 30, p.h / 2 - 8, 13, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#fde047'
-        ctx.fillRect(p.w / 2 - 8, -6, 8, 10)
+        if (img) {
+          drawFxImage(ctx, img, p.w)
+        } else {
+          ctx.fillStyle = '#dc2626'
+          ctx.fillRect(-p.w / 2, -p.h / 2 + 14, p.w, p.h - 26)
+          ctx.fillStyle = '#7f1d1d'
+          ctx.fillRect(-p.w / 2 + 20, -p.h / 2, p.w - 56, 22)
+          ctx.fillStyle = '#bfdbfe'
+          ctx.fillRect(-p.w / 2 + 26, -p.h / 2 + 3, 30, 16)
+          ctx.fillRect(-p.w / 2 + 62, -p.h / 2 + 3, 30, 16)
+          ctx.fillStyle = '#1c1917'
+          ctx.beginPath()
+          ctx.arc(-p.w / 2 + 30, p.h / 2 - 8, 13, 0, Math.PI * 2)
+          ctx.arc(p.w / 2 - 30, p.h / 2 - 8, 13, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.fillStyle = '#fde047'
+          ctx.fillRect(p.w / 2 - 8, -6, 8, 10)
+        }
         break
       }
     }

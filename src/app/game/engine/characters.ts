@@ -182,7 +182,7 @@ export const CHARACTERS: CharDef[] = [
       recovery: 20,
       range: 0,
       kb: 6,
-      projectile: { kind: 'table', speed: 6.5, w: 64, h: 40, yOff: 70 },
+      projectile: { kind: 'table', speed: 6.5, w: 110, h: 60, yOff: 70 },
       desc: 'テーブルを飛ばす飛び道具',
     },
     sp1: {
@@ -482,7 +482,7 @@ export const CHARACTERS: CharDef[] = [
       range: 0,
       kb: 15,
       launch: 9,
-      projectile: { kind: 'car', speed: 13, w: 170, h: 84, yOff: 42, pierce: true },
+      projectile: { kind: 'car', speed: 13, w: 190, h: 100, yOff: 46, pierce: true },
       meterCost: 100,
       shake: 14,
       banner: true,
@@ -664,7 +664,7 @@ export const CHARACTERS: CharDef[] = [
       recovery: 20,
       range: 0,
       kb: 1.5,
-      projectile: { kind: 'coin', speed: 9, w: 12, h: 12, yOff: 74, count: 5, interval: 4, spread: 26 },
+      projectile: { kind: 'coin', speed: 9, w: 70, h: 43, yOff: 60, count: 2, interval: 10, spread: 18 },
       desc: 'コインを大量に投げる弾幕',
     },
     sp1: {
