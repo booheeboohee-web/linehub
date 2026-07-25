@@ -390,7 +390,7 @@ export const CHARACTERS: CharDef[] = [
       range: 0,
       kb: 3,
       dot: { dps: 12, dur: 4, kind: 'bleed' },
-      projectile: { kind: 'paper', speed: 8.5, w: 40, h: 14, yOff: 66 },
+      projectile: { kind: 'paper', speed: 8.5, w: 85, h: 34, yOff: 66 },
       desc: '紙を高速で飛ばす。皮膚が切れる(出血)',
     },
     sp1: {

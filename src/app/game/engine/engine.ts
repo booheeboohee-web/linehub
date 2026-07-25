@@ -1907,11 +1907,17 @@ export class Game {
         break
       }
       case 'paper': {
-        ctx.rotate(Math.sin(this.frame / 3) * 0.5)
-        ctx.fillStyle = '#f8fafc'
-        ctx.fillRect(-p.w / 2, -3, p.w, 6)
-        ctx.fillStyle = '#e2e8f0'
-        ctx.fillRect(-p.w / 2, -1, p.w, 2)
+        const img = getFxImage('paper')
+        if (img) {
+          ctx.scale(dir, 1)
+          drawFxImage(ctx, img, p.w)
+        } else {
+          ctx.rotate(Math.sin(this.frame / 3) * 0.5)
+          ctx.fillStyle = '#f8fafc'
+          ctx.fillRect(-p.w / 2, -3, p.w, 6)
+          ctx.fillStyle = '#e2e8f0'
+          ctx.fillRect(-p.w / 2, -1, p.w, 2)
+        }
         break
       }
       case 'cosme': {
