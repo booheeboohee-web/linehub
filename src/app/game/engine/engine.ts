@@ -1866,23 +1866,31 @@ export class Game {
     // 洗濯物: 物干し竿+ひらひら
     ctx.save()
     ctx.globalAlpha = Math.min(1, b.t / 20)
-    ctx.strokeStyle = '#94a3b8'
-    ctx.lineWidth = 4
-    ctx.beginPath()
-    ctx.moveTo(b.x - b.w / 2, b.y - b.h)
-    ctx.lineTo(b.x + b.w / 2, b.y - b.h)
-    ctx.stroke()
-    const colors = ['#f8fafc', '#93c5fd', '#fda4af']
-    for (let i = 0; i < 3; i++) {
-      const cx = b.x - b.w / 2 + (b.w / 3) * i + b.w / 6
-      const sway = Math.sin((this.frame + i * 20) / 6) * 10
-      ctx.fillStyle = colors[i]
+    const img = getFxImage('laundry')
+    if (img) {
+      const w = b.w * 1.3
+      const h = img.naturalHeight * (w / img.naturalWidth)
+      const sway = Math.sin(this.frame / 6) * 6
+      ctx.drawImage(img, b.x - w / 2 + sway, b.y - b.h, w, h)
+    } else {
+      ctx.strokeStyle = '#94a3b8'
+      ctx.lineWidth = 4
       ctx.beginPath()
-      ctx.moveTo(cx - 16, b.y - b.h)
-      ctx.lineTo(cx + 16, b.y - b.h)
-      ctx.lineTo(cx + 12 + sway, b.y - b.h + 52)
-      ctx.lineTo(cx - 12 + sway, b.y - b.h + 52)
-      ctx.fill()
+      ctx.moveTo(b.x - b.w / 2, b.y - b.h)
+      ctx.lineTo(b.x + b.w / 2, b.y - b.h)
+      ctx.stroke()
+      const colors = ['#f8fafc', '#93c5fd', '#fda4af']
+      for (let i = 0; i < 3; i++) {
+        const cx = b.x - b.w / 2 + (b.w / 3) * i + b.w / 6
+        const sway = Math.sin((this.frame + i * 20) / 6) * 10
+        ctx.fillStyle = colors[i]
+        ctx.beginPath()
+        ctx.moveTo(cx - 16, b.y - b.h)
+        ctx.lineTo(cx + 16, b.y - b.h)
+        ctx.lineTo(cx + 12 + sway, b.y - b.h + 52)
+        ctx.lineTo(cx - 12 + sway, b.y - b.h + 52)
+        ctx.fill()
+      }
     }
     ctx.restore()
   }
@@ -1921,10 +1929,16 @@ export class Game {
         break
       }
       case 'cosme': {
-        ctx.fillStyle = '#f472b6'
-        ctx.fillRect(-8, -10, 16, 20)
-        ctx.fillStyle = '#be185d'
-        ctx.fillRect(-8, -10, 16, 6)
+        const img = getFxImage('cosme')
+        if (img) {
+          ctx.scale(dir, 1)
+          drawFxImage(ctx, img, p.w)
+        } else {
+          ctx.fillStyle = '#f472b6'
+          ctx.fillRect(-8, -10, 16, 20)
+          ctx.fillStyle = '#be185d'
+          ctx.fillRect(-8, -10, 16, 6)
+        }
         break
       }
       case 'coin': {
@@ -1944,18 +1958,24 @@ export class Game {
         break
       }
       case 'booger': {
-        ctx.fillStyle = '#84cc16'
-        ctx.beginPath()
-        ctx.arc(0, 0, 7, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#a3e635'
-        ctx.beginPath()
-        ctx.arc(-2, -2, 3, 0, Math.PI * 2)
-        ctx.fill()
+        const img = getFxImage('booger')
+        if (img) {
+          ctx.scale(dir, 1)
+          drawFxImage(ctx, img, p.w)
+        } else {
+          ctx.fillStyle = '#84cc16'
+          ctx.beginPath()
+          ctx.arc(0, 0, 7, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.fillStyle = '#a3e635'
+          ctx.beginPath()
+          ctx.arc(-2, -2, 3, 0, Math.PI * 2)
+          ctx.fill()
+        }
         break
       }
       case 'bug': {
-        // バッタの群れ
+        // 毛玉の群れ(チャチャ)
         for (let i = 0; i < 9; i++) {
           const bx = ((Math.sin(p.seed + i * 2.1) + 1) / 2 - 0.5) * p.w
           const by = ((Math.cos(p.seed + i * 1.7 + this.frame / 8) + 1) / 2 - 0.5) * p.h
@@ -1966,7 +1986,29 @@ export class Game {
         }
         break
       }
+      case 'locust': {
+        const img = getFxImage('bug')
+        if (img) {
+          ctx.scale(dir, 1)
+          drawFxImage(ctx, img, p.w)
+        } else {
+          for (let i = 0; i < 9; i++) {
+            const bx = ((Math.sin(p.seed + i * 2.1) + 1) / 2 - 0.5) * p.w
+            const by = ((Math.cos(p.seed + i * 1.7 + this.frame / 8) + 1) / 2 - 0.5) * p.h
+            ctx.fillStyle = '#65a30d'
+            ctx.fillRect(bx - 5, by - 2, 10, 5)
+            ctx.fillStyle = '#365314'
+            ctx.fillRect(bx + (dir > 0 ? 3 : -5), by - 3, 3, 3)
+          }
+        }
+        break
+      }
       case 'shock': {
+        const shockImg = getFxImage('shock')
+        if (shockImg) {
+          drawFxImage(ctx, shockImg, p.w)
+          break
+        }
         ctx.strokeStyle = '#fef08a'
         ctx.lineWidth = 4
         ctx.beginPath()

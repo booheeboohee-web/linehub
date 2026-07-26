@@ -31,7 +31,8 @@ export type ProjectileKind =
   | 'cosme' // コスメ
   | 'coin' // コイン
   | 'booger' // はなくそ
-  | 'bug' // バッタ
+  | 'bug' // 毛玉(チャチャ)
+  | 'locust' // バッタ投げ(坊)
   | 'shock' // 電光石火
   | 'car' // 車
 
@@ -523,7 +524,7 @@ export const CHARACTERS: CharDef[] = [
       recovery: 18,
       range: 0,
       kb: 2,
-      projectile: { kind: 'cosme', speed: 7.5, w: 22, h: 22, yOff: 70, count: 3, interval: 7, spread: 18 },
+      projectile: { kind: 'cosme', speed: 7.5, w: 130, h: 63, yOff: 70, count: 2, interval: 10, spread: 20 },
       desc: '化粧品を次々と飛ばす。連続ヒット',
     },
     sp1: {
@@ -745,7 +746,7 @@ export const CHARACTERS: CharDef[] = [
       recovery: 22,
       range: 0,
       kb: 6,
-      projectile: { kind: 'bug', speed: 6, w: 80, h: 60, yOff: 80, pierce: true },
+      projectile: { kind: 'locust', speed: 6, w: 130, h: 80, yOff: 80, pierce: true },
       meterCost: 50,
       shake: 5,
       banner: true,
