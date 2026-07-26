@@ -376,7 +376,7 @@ export class Game {
     this.screen = 'mode'
     this.modeCursor = 0
     this.audio.sfx('confirm')
-    this.audio.startBgm()
+    this.audio.startBgm('title')
   }
 
   private gotoSelect() {
@@ -386,6 +386,7 @@ export class Game {
     this.selCursor = [0, 4]
     if (this.isArcade) this.arcadeIndex = 0
     this.audio.sfx('confirm')
+    this.audio.startBgm('select')
   }
 
   private startMatch() {
@@ -400,6 +401,7 @@ export class Game {
     this.startRound()
     this.screen = 'battle'
     this.audio.sfx('super')
+    this.audio.startBgm('battle')
   }
 
   private startRound() {
@@ -426,7 +428,7 @@ export class Game {
   private gotoTitle() {
     this.screen = 'title'
     this.isArcade = false
-    this.audio.stopBgm()
+    this.audio.startBgm('title')
   }
 
   // ---------- メインループ ----------

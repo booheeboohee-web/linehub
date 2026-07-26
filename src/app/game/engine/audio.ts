@@ -1,4 +1,6 @@
-// WebAudio によるSFX/BGM生成(音声アセット不要)
+// WebAudio によるSFX生成 + 実写BGM(mp3)再生。BGMファイルが無ければチップチューンにフォールバック。
+
+import { BgmName, resolveBgmSrc } from './bgm'
 
 export type SfxName = 'hit' | 'kick' | 'guard' | 'special' | 'super' | 'ko' | 'select' | 'confirm' | 'status' | 'jump' | 'error'
 
@@ -6,7 +8,21 @@ export class AudioMan {
   private ctx: AudioContext | null = null
   private bgmTimer: number | null = null
   private bgmStep = 0
-  muted = false
+  private _muted = false
+
+  private bgmAudio = new Map<BgmName, HTMLAudioElement>()
+  private bgmFailed = new Set<BgmName>()
+  private currentBgmName: BgmName | null = null
+  private pendingBgm: BgmName | null = null
+
+  get muted() {
+    return this._muted
+  }
+
+  set muted(v: boolean) {
+    this._muted = v
+    for (const a of this.bgmAudio.values()) a.muted = v
+  }
 
   private ensure(): AudioContext | null {
     if (typeof window === 'undefined') return null
@@ -19,9 +35,10 @@ export class AudioMan {
     return this.ctx
   }
 
-  /** ユーザー操作時に呼んでAudioContextを解錠する */
+  /** ユーザー操作時に呼んでAudioContextを解錠する(実写BGMの再生ブロック解除も兼ねる) */
   unlock() {
     this.ensure()
+    this.tryPlayPending()
   }
 
   private tone(freq: number, dur: number, type: OscillatorType, vol: number, slideTo?: number) {
@@ -105,8 +122,63 @@ export class AudioMan {
     }
   }
 
-  // 簡易チップチューンBGMループ
-  startBgm() {
+  private getOrLoadTrack(name: BgmName): HTMLAudioElement | null {
+    if (this.bgmFailed.has(name)) return null
+    let a = this.bgmAudio.get(name)
+    if (!a) {
+      a = new Audio(resolveBgmSrc(name))
+      a.loop = true
+      a.volume = 0.55
+      a.muted = this.muted
+      a.addEventListener('error', () => {
+        this.bgmFailed.add(name)
+        if (this.currentBgmName === name) this.startProceduralBgm()
+      })
+      this.bgmAudio.set(name, a)
+    }
+    return a
+  }
+
+  private tryPlayPending() {
+    const name = this.pendingBgm
+    if (!name) return
+    if (this.bgmFailed.has(name)) {
+      this.startProceduralBgm()
+      return
+    }
+    const track = this.getOrLoadTrack(name)
+    if (!track) return
+    track.muted = this.muted
+    void track
+      .play()
+      .then(() => {
+        this.pendingBgm = null
+        this.stopProceduralBgm()
+      })
+      .catch(() => {
+        // 自動再生ブロック等。次の unlock() 呼び出し時に再挑戦する。
+      })
+  }
+
+  /** 実写BGM(あれば)を再生。無ければチップチューンにフォールバック */
+  startBgm(name: BgmName) {
+    if (this.currentBgmName === name) return
+    for (const a of this.bgmAudio.values()) a.pause()
+    this.stopProceduralBgm()
+    this.currentBgmName = name
+    this.pendingBgm = name
+    this.tryPlayPending()
+  }
+
+  stopBgm() {
+    this.currentBgmName = null
+    this.pendingBgm = null
+    for (const a of this.bgmAudio.values()) a.pause()
+    this.stopProceduralBgm()
+  }
+
+  // 簡易チップチューンBGMループ(実写BGMが無い時のフォールバック)
+  private startProceduralBgm() {
     const ctx = this.ensure()
     if (!ctx || this.bgmTimer !== null) return
     const bass = [110, 110, 147, 147, 131, 131, 98, 98]
@@ -123,7 +195,7 @@ export class AudioMan {
     }, 160)
   }
 
-  stopBgm() {
+  private stopProceduralBgm() {
     if (this.bgmTimer !== null) {
       clearInterval(this.bgmTimer)
       this.bgmTimer = null
@@ -132,6 +204,8 @@ export class AudioMan {
 
   destroy() {
     this.stopBgm()
+    for (const a of this.bgmAudio.values()) a.src = ''
+    this.bgmAudio.clear()
     if (this.ctx) void this.ctx.close()
     this.ctx = null
   }
