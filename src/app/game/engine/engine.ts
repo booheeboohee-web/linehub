@@ -3,7 +3,7 @@
 
 import { CHARACTERS, CharDef, MoveDef, StatusKind, STATUS_INFO, ProjectileKind, ARCADE_QUEUE } from './characters'
 import { getSprites, pickSprite, SpritePose } from './sprites'
-import { getStageImage, getTitleImage, STAGE_COUNT } from './stages'
+import { getStageImage, getTitleImage, getSelectImage, STAGE_COUNT } from './stages'
 import { getFxImage } from './fx'
 
 /** 画像の縦横比を保ったまま中心基準で描画する。 */
@@ -1369,7 +1369,12 @@ export class Game {
   }
 
   private renderSelect(ctx: CanvasRenderingContext2D) {
-    this.renderBg(ctx)
+    const bgImg = getSelectImage()
+    if (bgImg) {
+      ctx.drawImage(bgImg, 0, 0, VIEW_W, VIEW_H)
+    } else {
+      this.renderBg(ctx)
+    }
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)
     ctx.textAlign = 'center'

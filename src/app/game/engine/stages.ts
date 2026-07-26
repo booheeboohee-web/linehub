@@ -8,11 +8,13 @@ declare global {
   interface Window {
     __STAGE_ASSETS__?: string[]
     __TITLE_ASSET__?: string
+    __SELECT_ASSET__?: string
   }
 }
 
 const cache = new Map<number, HTMLImageElement | 'none' | 'loading'>()
 let titleCache: HTMLImageElement | 'none' | 'loading' | undefined
+let selectCache: HTMLImageElement | 'none' | 'loading' | undefined
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -54,4 +56,19 @@ export function getTitleImage(): HTMLImageElement | null {
     return null
   }
   return titleCache
+}
+
+/** キャラ選択画面の背景(実写)。未読み込みならロードを開始してnullを返す。 */
+export function getSelectImage(): HTMLImageElement | null {
+  if (selectCache === 'none' || selectCache === 'loading' || selectCache === undefined) {
+    if (selectCache === undefined) {
+      selectCache = 'loading'
+      const src = (typeof window !== 'undefined' ? window.__SELECT_ASSET__ : undefined) ?? '/game-bg/select.webp'
+      void loadImage(src).then((img) => {
+        selectCache = img ?? 'none'
+      })
+    }
+    return null
+  }
+  return selectCache
 }
