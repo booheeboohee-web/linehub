@@ -57,6 +57,32 @@ class Input {
   prev = emptyInput()
   press = emptyInput()
   private queued: Partial<InputState> = {}
+  // 入力ソースごとに分けて保持し、cur は全ソースのOR。
+  // (ゲームパッドを「毎フレーム直接cur書き込み」にすると、待機中(全ボタン離した状態)の
+  //  ポーリングがキーボード入力を即座に上書き消去してしまうため)
+  private kb = emptyInput()
+  private gp = emptyInput()
+  private touch = emptyInput()
+
+  private recompute() {
+    const keys = Object.keys(this.cur) as ButtonName[]
+    for (const k of keys) this.cur[k] = this.kb[k] || this.gp[k] || this.touch[k]
+  }
+
+  setKeyboard(btn: ButtonName, down: boolean) {
+    this.kb[btn] = down
+    this.recompute()
+  }
+
+  setGamepad(state: InputState) {
+    this.gp = state
+    this.recompute()
+  }
+
+  setTouch(btn: ButtonName, down: boolean) {
+    this.touch[btn] = down
+    this.recompute()
+  }
 
   /** フレーム間で押して離された入力も取りこぼさないようキューに積む */
   queue(btn: ButtonName) {
@@ -319,7 +345,7 @@ export class Game {
   /** タッチUI(1P)からのボタン入力 */
   setTouchButton(btn: ButtonName, down: boolean) {
     this.audio.unlock()
-    this.inputs[0].cur[btn] = down
+    this.inputs[0].setTouch(btn, down)
     if (down) this.inputs[0].queue(btn)
   }
 
@@ -335,17 +361,18 @@ export class Game {
     for (let i = 0; i < 2; i++) {
       const gp = connected[i]
       if (!gp) continue
-      const input = this.inputs[i]
       const axX = gp.axes[0] ?? 0
       const axY = gp.axes[1] ?? 0
-      input.cur.left = axX < -dz || (gp.buttons[14]?.pressed ?? false)
-      input.cur.right = axX > dz || (gp.buttons[15]?.pressed ?? false)
-      input.cur.up = axY < -dz || (gp.buttons[12]?.pressed ?? false)
-      input.cur.down = axY > dz || (gp.buttons[13]?.pressed ?? false)
-      input.cur.punch = gp.buttons[0]?.pressed ?? false
-      input.cur.kick = gp.buttons[1]?.pressed ?? false
-      input.cur.unique = gp.buttons[2]?.pressed ?? false
-      input.cur.special = gp.buttons[3]?.pressed ?? false
+      const state = emptyInput()
+      state.left = axX < -dz || (gp.buttons[14]?.pressed ?? false)
+      state.right = axX > dz || (gp.buttons[15]?.pressed ?? false)
+      state.up = axY < -dz || (gp.buttons[12]?.pressed ?? false)
+      state.down = axY > dz || (gp.buttons[13]?.pressed ?? false)
+      state.punch = gp.buttons[0]?.pressed ?? false
+      state.kick = gp.buttons[1]?.pressed ?? false
+      state.unique = gp.buttons[2]?.pressed ?? false
+      state.special = gp.buttons[3]?.pressed ?? false
+      this.inputs[i].setGamepad(state)
       if (gp.buttons.some((b) => b.pressed)) this.audio.unlock()
     }
   }
@@ -360,7 +387,7 @@ export class Game {
     const hit = map[e.code]
     if (hit) {
       e.preventDefault()
-      this.inputs[hit[0]].cur[hit[1]] = down
+      this.inputs[hit[0]].setKeyboard(hit[1], down)
       if (down && !e.repeat) {
         this.inputs[hit[0]].queue(hit[1])
         this.audio.unlock()
