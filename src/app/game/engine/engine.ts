@@ -325,6 +325,31 @@ export class Game {
 
   // ---------- 入力 ----------
 
+  /** ゲームパッド(USB/Bluetoothコントローラー)の入力を毎フレーム反映。1台目=1P、2台目=2P */
+  private pollGamepads() {
+    if (typeof navigator === 'undefined' || !navigator.getGamepads) return
+    const pads = navigator.getGamepads()
+    const connected: Gamepad[] = []
+    for (const gp of pads) if (gp && gp.connected) connected.push(gp)
+    const dz = 0.4
+    for (let i = 0; i < 2; i++) {
+      const gp = connected[i]
+      if (!gp) continue
+      const input = this.inputs[i]
+      const axX = gp.axes[0] ?? 0
+      const axY = gp.axes[1] ?? 0
+      input.cur.left = axX < -dz || (gp.buttons[14]?.pressed ?? false)
+      input.cur.right = axX > dz || (gp.buttons[15]?.pressed ?? false)
+      input.cur.up = axY < -dz || (gp.buttons[12]?.pressed ?? false)
+      input.cur.down = axY > dz || (gp.buttons[13]?.pressed ?? false)
+      input.cur.punch = gp.buttons[0]?.pressed ?? false
+      input.cur.kick = gp.buttons[1]?.pressed ?? false
+      input.cur.unique = gp.buttons[2]?.pressed ?? false
+      input.cur.special = gp.buttons[3]?.pressed ?? false
+      if (gp.buttons.some((b) => b.pressed)) this.audio.unlock()
+    }
+  }
+
   private onKey(e: KeyboardEvent, down: boolean) {
     const map: Record<string, [number, ButtonName]> = {
       KeyA: [0, 'left'], KeyD: [0, 'right'], KeyW: [0, 'up'], KeyS: [0, 'down'],
@@ -450,6 +475,7 @@ export class Game {
 
   private update() {
     this.frame++
+    this.pollGamepads()
     this.inputs[0].beginFrame()
     this.inputs[1].beginFrame()
     switch (this.screen) {
@@ -1333,7 +1359,7 @@ export class Game {
     }
     ctx.font = this.font(14, false)
     ctx.fillStyle = '#cbd5e1'
-    ctx.fillText('PC: 1P=WASD+F/G/H/Space  2P=矢印+J/K/L/Enter  (M:ミュート)', VIEW_W / 2, VIEW_H - 16)
+    ctx.fillText('PC: 1P=WASD+F/G/H/Space  2P=矢印+J/K/L/Enter  ・ コントローラーも使えます (M:ミュート)', VIEW_W / 2, VIEW_H - 16)
     ctx.textAlign = 'left'
   }
 
